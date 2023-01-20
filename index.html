@@ -1,1 +1,549 @@
-Hello world
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>PW1 - Ex1+2 - Fabiano Manschein</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #c {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .split {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+      }
+      .split > div {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <canvas id="c"></canvas>
+    <div class="split">
+      <div id="view1" tabindex="1"></div>
+      <div id="view2" tabindex="2"></div>
+    </div>
+  </body>
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    import { FontLoader } from "three/addons/loaders/FontLoader.js";
+    import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { FirstPersonControls } from "three/addons/controls/FirstPersonControls.js";
+    import { FlyControls } from "three/addons/controls/FlyControls.js";
+    import { TrackballControls } from "three/addons/controls/TrackballControls.js";
+
+    function main() {
+      /* SETUP */
+      // Variable setup
+      const objects = []; // Stores all object meshes (used for rotation)
+      const spread = 15; // The distance between each object mesh
+
+      // Get HTML elements
+      const view1Elem = document.querySelector("#view1");
+      const view2Elem = document.querySelector("#view2");
+      const canvas = document.querySelector("#c");
+
+      // Scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000);
+
+      // Render
+      const renderer = new THREE.WebGLRenderer({ canvas });
+      document.body.appendChild(renderer.domElement);
+
+      /* CAMERA [1] */
+      const fov = 60;
+      const aspect = 2; // the canvas default
+      const near = 0.1;
+      const far = 1000;
+      const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+      camera.position.z = 200;
+      camera.position.y = 100;
+
+      // Camera helper for camera 1
+      const cameraHelper = new THREE.CameraHelper(camera);
+      scene.add(cameraHelper);
+
+      /* CONTROLS [1] */
+      // const controls = new OrbitControls(camera, view1Elem);
+      // const controls = new FirstPersonControls(camera, view1Elem);
+      const controls = new FlyControls(camera, view1Elem);
+      // const controls = new TrackballControls(camera, view1Elem);
+      // controls.listenToKeyEvents(window); // optional
+      controls.enableDamping = false; // an animation loop is required when either damping or auto-rotation are enabled
+      controls.dampingFactor = 0.05;
+      controls.screenSpacePanning = false;
+      controls.minDistance = 0;
+      controls.maxDistance = 500;
+      controls.maxPolarAngle = Math.PI / 2;
+
+      /* CAMERA [2] */
+      const camera2 = new THREE.OrthographicCamera(
+        -20, //left
+        20, // right
+        20, //top
+        -20, //bottom
+        0.1, //near
+        1000 //far
+      );
+      camera2.zoom = 0.2;
+      camera2.position.set(100, 150, 100);
+      camera2.lookAt(0, 5, 0);
+
+      /* CONTROLS [2] */
+      const controls2 = new OrbitControls(camera2, view2Elem);
+      controls2.target.set(0, 5, 0);
+      controls2.update();
+
+      /* FUNCTION DEFINITIONS */
+
+      // Cut the screen into two, allowing for two camera
+      function setScissorForElement(elem) {
+        const canvasRect = canvas.getBoundingClientRect();
+        const elemRect = elem.getBoundingClientRect();
+        // compute a canvas relative rectangle
+        const right = Math.min(elemRect.right, canvasRect.right) - canvasRect.left;
+        const left = Math.max(0, elemRect.left - canvasRect.left);
+        const bottom = Math.min(elemRect.bottom, canvasRect.bottom) - canvasRect.top;
+        const top = Math.max(0, elemRect.top - canvasRect.top);
+        const width = Math.min(canvasRect.width, right - left);
+        const height = Math.min(canvasRect.height, bottom - top);
+        // setup the scissor to only render to that part of the canvas
+        const positiveYUpBottom = canvasRect.height - bottom;
+        renderer.setScissor(left, positiveYUpBottom, width, height);
+        renderer.setViewport(left, positiveYUpBottom, width, height);
+        // return the aspect
+        return width / height;
+      }
+
+      // Create a transparent wall mesh
+      function createWall() {
+        const width = 80;
+        const height = 80;
+        const depth = 1;
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const material = new THREE.MeshBasicMaterial({
+          side: THREE.DoubleSide,
+          color: 0xaaaaaa,
+          opacity: 0.25,
+          transparent: true,
+        });
+        const wall = new THREE.Mesh(geometry, material);
+        return wall;
+      }
+
+      // Lights
+      {
+        const color = 0xffffff;
+        const intensity = 1;
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.position.set(-1, 2, 4);
+        scene.add(light);
+      }
+      {
+        const color = 0xffffff;
+        const intensity = 1;
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.position.set(1, -2, -4);
+        scene.add(light);
+      }
+
+      // Add an object `obj` at position `x, y, 10` in relation to parent mesh `parent`.
+      function addObject(x, y, obj, parent) {
+        obj.position.x = x * spread;
+        obj.position.y = y * spread;
+        obj.position.z = 10; // Makes the object be a distance from its parent (wall)
+        parent.add(obj);
+        objects.push(obj);
+      }
+
+      // Create a material with random hue
+      function createMaterial() {
+        const material = new THREE.MeshPhongMaterial();
+        const hue = Math.random();
+        const saturation = 1;
+        const luminance = 0.5;
+        material.color.setHSL(hue, saturation, luminance);
+        return material;
+      }
+
+      // Create a mesh from given `geometry` and add it using `addObject()`
+      function addSolidGeometry(x, y, geometry, parent) {
+        const mesh = new THREE.Mesh(geometry, createMaterial());
+        addObject(x, y, mesh, parent);
+      }
+
+      // Create a mesh made of line segments from given `geometry` and add it using `addObject()`
+      function addLineGeometry(x, y, geometry, parent) {
+        const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+        const mesh = new THREE.LineSegments(geometry, material);
+        addObject(x, y, mesh, parent);
+      }
+
+      // Create a layer: Wall + 22 objects. `offset` is the wall z position, `chaos` is a random value from 0 to 1.2 to randomize some object parameters
+      function createLayer(offset, chaos) {
+        const wall = createWall();
+        wall.position.z = offset;
+        wall.position.y = 50;
+        scene.add(wall);
+
+        {
+          const width = chaos * 8;
+          const height = 8;
+          const depth = 8;
+          addSolidGeometry(-2, 2, new THREE.BoxGeometry(width, height, depth), wall);
+        }
+        {
+          const radius = chaos * 7;
+          const segments = 24;
+          addSolidGeometry(-1, 2, new THREE.CircleGeometry(radius, segments), wall);
+        }
+        {
+          const radius = 6;
+          const height = chaos * 8;
+          const segments = 16;
+          addSolidGeometry(0, 2, new THREE.ConeGeometry(radius, height, segments), wall);
+        }
+        {
+          const radiusTop = 4;
+          const radiusBottom = chaos * 4;
+          const height = 8;
+          const radialSegments = 12;
+          addSolidGeometry(1, 2, new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments), wall);
+        }
+        {
+          const radius = chaos * 7;
+          addSolidGeometry(2, 2, new THREE.DodecahedronGeometry(radius), wall);
+        }
+        {
+          const shape = new THREE.Shape();
+          const x = -2.5 * chaos;
+          const y = -5;
+          shape.moveTo(x + 2.5, y + 2.5);
+          shape.bezierCurveTo(x + 2.5, y + 2.5, x + 2, y, x, y);
+          shape.bezierCurveTo(x - 3, y, x - 3, y + 3.5, x - 3, y + 3.5);
+          shape.bezierCurveTo(x - 3, y + 5.5, x - 1.5, y + 7.7, x + 2.5, y + 9.5);
+          shape.bezierCurveTo(x + 6, y + 7.7, x + 8, y + 4.5, x + 8, y + 3.5);
+          shape.bezierCurveTo(x + 8, y + 3.5, x + 8, y, x + 5, y);
+          shape.bezierCurveTo(x + 3.5, y, x + 2.5, y + 2.5, x + 2.5, y + 2.5);
+
+          const extrudeSettings = {
+            steps: 2,
+            depth: 2,
+            bevelEnabled: true,
+            bevelThickness: chaos * 1,
+            bevelSize: 1,
+            bevelSegments: 2,
+          };
+
+          addSolidGeometry(-2, 1, new THREE.ExtrudeGeometry(shape, extrudeSettings), wall);
+        }
+        {
+          const radius = chaos * 7;
+          addSolidGeometry(-1, 1, new THREE.IcosahedronGeometry(radius), wall);
+        }
+        {
+          const points = [];
+          for (let i = 0; i < 10; ++i) {
+            points.push(new THREE.Vector2(Math.sin(chaos * i * 0.2) * 3 + 3, (i - 5) * 0.8));
+          }
+          addSolidGeometry(0, 1, new THREE.LatheGeometry(points), wall);
+        }
+        {
+          const radius = chaos * 7;
+          addSolidGeometry(1, 1, new THREE.OctahedronGeometry(radius), wall);
+        }
+
+        {
+          const width = 9;
+          const height = chaos * 9;
+          const widthSegments = 2;
+          const heightSegments = 2;
+          addSolidGeometry(-2, 0, new THREE.PlaneGeometry(width, height, widthSegments, heightSegments), wall);
+        }
+        {
+          const verticesOfCube = [-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1];
+          const indicesOfFaces = [
+            2, 1, 0, 0, 3, 2, 0, 4, 7, 7, 3, 0, 0, 1, 5, 5, 4, 0, 1, 2, 6, 6, 5, 1, 2, 3, 7, 7, 6, 2, 4, 5, 6, 6, 7, 4,
+          ];
+          const radius = chaos * 7;
+          const detail = 2;
+          addSolidGeometry(-1, 0, new THREE.PolyhedronGeometry(verticesOfCube, indicesOfFaces, radius, detail), wall);
+        }
+        {
+          const innerRadius = chaos * 2;
+          const outerRadius = 7;
+          const segments = 18;
+          addSolidGeometry(0, 0, new THREE.RingGeometry(innerRadius, outerRadius, segments), wall);
+        }
+        {
+          const shape = new THREE.Shape();
+          const x = -2.5;
+          const y = -5 * chaos;
+          shape.moveTo(x + 2.5, y + 2.5);
+          shape.bezierCurveTo(x + 2.5, y + 2.5, x + 2, y, x, y);
+          shape.bezierCurveTo(x - 3, y, x - 3, y + 3.5, x - 3, y + 3.5);
+          shape.bezierCurveTo(x - 3, y + 5.5, x - 1.5, y + 7.7, x + 2.5, y + 9.5);
+          shape.bezierCurveTo(x + 6, y + 7.7, x + 8, y + 4.5, x + 8, y + 3.5);
+          shape.bezierCurveTo(x + 8, y + 3.5, x + 8, y, x + 5, y);
+          shape.bezierCurveTo(x + 3.5, y, x + 2.5, y + 2.5, x + 2.5, y + 2.5);
+          addSolidGeometry(1, 0, new THREE.ShapeGeometry(shape), wall);
+        }
+        {
+          const radius = chaos * 7;
+          const widthSegments = 12;
+          const heightSegments = 8;
+          addSolidGeometry(2, 0, new THREE.SphereGeometry(radius, widthSegments, heightSegments), wall);
+        }
+        {
+          const radius = chaos * 7;
+          addSolidGeometry(-2, -1, new THREE.TetrahedronGeometry(radius), wall);
+        }
+        {
+          const loader = new FontLoader();
+          // promisify font loading
+          function loadFont(url) {
+            return new Promise((resolve, reject) => {
+              loader.load(url, resolve, undefined, reject);
+            });
+          }
+
+          async function doit() {
+            const font = await loadFont(
+              "https://threejs.org/examples/fonts/helvetiker_regular.typeface.json"
+            ); /* threejsfundamentals: url */
+            const geometry = new TextGeometry("I M L E X", {
+              font: font,
+              size: chaos * 3.0,
+              height: 0.2,
+              curveSegments: 12,
+              bevelEnabled: true,
+              bevelThickness: 0.15,
+              bevelSize: 0.3,
+              bevelSegments: 5,
+            });
+            const mesh = new THREE.Mesh(geometry, createMaterial());
+            geometry.computeBoundingBox();
+            geometry.boundingBox.getCenter(mesh.position).multiplyScalar(-1);
+
+            const parent = new THREE.Object3D();
+            parent.add(mesh);
+
+            addObject(-1, -1, parent, wall);
+          }
+          doit();
+        }
+        {
+          const radius = 5;
+          const tubeRadius = chaos * 2;
+          const radialSegments = 8;
+          const tubularSegments = 24;
+          addSolidGeometry(0, -1, new THREE.TorusGeometry(radius, tubeRadius, radialSegments, tubularSegments), wall);
+        }
+        {
+          const radius = chaos * 3.5;
+          const tube = 1.5;
+          const radialSegments = 8;
+          const tubularSegments = 64;
+          const p = 2;
+          const q = 3;
+          addSolidGeometry(
+            1,
+            -1,
+            new THREE.TorusKnotGeometry(radius, tube, tubularSegments, radialSegments, p, q),
+            wall
+          );
+        }
+        {
+          class CustomSinCurve extends THREE.Curve {
+            constructor(scale) {
+              super();
+              this.scale = scale;
+            }
+            getPoint(t) {
+              const tx = t * 3 - 1.5;
+              const ty = chaos * Math.sin(2 * Math.PI * t);
+              const tz = 0;
+              return new THREE.Vector3(tx, ty, tz).multiplyScalar(this.scale);
+            }
+          }
+
+          const path = new CustomSinCurve(4);
+          const tubularSegments = 20;
+          const radius = chaos * 1;
+          const radialSegments = 8;
+          const closed = false;
+          addSolidGeometry(2, -1, new THREE.TubeGeometry(path, tubularSegments, radius, radialSegments, closed), wall);
+        }
+        {
+          const width = 8;
+          const height = 8;
+          const depth = 8;
+          const thresholdAngle = chaos * 15;
+          addLineGeometry(
+            -1,
+            -2,
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(width, height, depth), thresholdAngle),
+            wall
+          );
+        }
+        {
+          const width = 8;
+          const height = chaos * 8;
+          const depth = 8;
+          addLineGeometry(1, -2, new THREE.WireframeGeometry(new THREE.BoxGeometry(width, height, depth)), wall);
+        }
+      }
+
+      // Resize the renderer so that it fits the divs (the window is divided into 2)
+      function resizeRendererToDisplaySize(renderer) {
+        const canvas = renderer.domElement;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const needResize = canvas.width !== width || canvas.height !== height;
+        if (needResize) {
+          renderer.setSize(width, height, false);
+        }
+        return needResize;
+      }
+
+      // Create a cross using a Line. `opacity` defines its opacity
+      function createCross(opacity) {
+        const material = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          opacity: opacity,
+          transparent: true,
+        });
+        const points = [];
+        points.push(new THREE.Vector3(1, 0, 0));
+        points.push(new THREE.Vector3(-1, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 1));
+        points.push(new THREE.Vector3(0, 0, -1));
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const cross = new THREE.Line(geometry, material);
+        return cross;
+      }
+
+      // Create a floor of crosses
+      function floorOfCrosses() {
+        const floor = new THREE.Object3D();
+        scene.add(floor);
+        // Loop through x and z axis from -50 to +50, so that the floor center is at (0,0,0)
+        for (let x = -50; x < 50; x++) {
+          // x axis
+          for (let z = -50; z < 50; z++) {
+            // z axis
+            const x_pos = x * 10; // Scale up by 10
+            const z_pos = z * 10; // Scale up by 10
+
+            // Calculate distance from center to determine cross opacity. This create a fading effect in a round area around the center
+            const radius = Math.sqrt(Math.pow(x_pos, 2) + Math.pow(z_pos, 2));
+            const alpha = 100; // minimum distance with opacity=1
+            let crossOpacity;
+            if (radius < alpha) {
+              // Show cross with full opacity when its under the minimum distance
+              crossOpacity = 1;
+            } else {
+              // Progressive opacity reduction the further from the center it is
+              const beta = radius - alpha; // Distance from minimum (alpha)
+              crossOpacity = (200 - beta) / 200;
+            }
+            // Create and position the cross
+            const cross = createCross(crossOpacity);
+            cross.position.x = x_pos;
+            cross.position.z = z_pos;
+            // Add the cross to the floor as a child
+            floor.add(cross);
+          }
+        }
+      }
+
+      function render(time) {
+        time *= 0.001;
+        resizeRendererToDisplaySize(renderer);
+        controls.update(time);
+        // turn on the scissor
+        renderer.setScissorTest(true);
+        // render the original view
+        {
+          const aspect = setScissorForElement(view1Elem);
+          // adjust the camera for this aspect
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+          cameraHelper.update();
+          // don't draw the camera helper in the original view
+          cameraHelper.visible = false;
+          scene.background.set(0x000000);
+          // render
+          renderer.render(scene, camera);
+        }
+        // render from the 2nd camera
+        {
+          const aspect = setScissorForElement(view2Elem);
+          // adjust the camera for this aspect
+          camera2.aspect = aspect;
+          camera2.updateProjectionMatrix();
+          // draw the camera helper in the 2nd view
+          cameraHelper.visible = true;
+          scene.background.set(0x000040);
+          renderer.render(scene, camera2);
+        }
+        // Rotate all objects inside `obj`
+        objects.forEach((obj, ndx) => {
+          const speed = 0.1 + ndx * 0.05;
+          const rot = time * speed;
+          obj.rotation.x = rot;
+          obj.rotation.y = rot;
+        });
+
+        requestAnimationFrame(render);
+      }
+
+      /* DO STUFF */
+      // Create the floor of crosses
+      floorOfCrosses();
+
+      // Create 3 layers of objects + walls
+      let chaos, offset;
+      for (let index = -1; index < 2; index++) {
+        offset = index * 30;
+        chaos = Math.random() * 1.5;
+        createLayer(offset, chaos);
+      }
+
+      // Render
+      requestAnimationFrame(render);
+    }
+
+    // Run everything
+    main();
+  </script>
+</html>

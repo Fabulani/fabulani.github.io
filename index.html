@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>CubeBro</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #c {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      #info {
+        position: absolute;
+        top: 10px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { AnimationClip, NumberKeyframeTrack, VectorKeyframeTrack } from "three";
+      import { Mesh, AnimationMixer } from "three";
+
+      var scene = new THREE.Scene();
+
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      var camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.01, 1000);
+      camera.position.set(0, 5, 3);
+
+      // CONTROLS
+      let controls;
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.listenToKeyEvents(window); // optional
+      controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+      controls.dampingFactor = 0.05;
+      controls.screenSpacePanning = false;
+      controls.minDistance = 0;
+      controls.maxDistance = 500;
+      controls.target = new THREE.Vector3(0, 3, 0);
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 1;
+
+      document.body.appendChild(renderer.domElement);
+
+      // Lights
+      {
+        const color = 0xffffff;
+        const intensity = 0.3;
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.position.set(-1, 2, 4);
+        scene.add(light);
+      }
+      {
+        const color = 0xffffff;
+        const intensity = 1;
+        const light = new THREE.SpotLight(color, intensity);
+        light.position.set(0, 6, 0);
+        light.rotation.set(0, 0, Math.PI);
+        light.penumbra = 0.8;
+        scene.add(light);
+      }
+
+      /* CREATE THE CUBEBRO MODEL USING PRIMITIVE CUBES */
+      // Scene graph based on the Three.js Scene Graph documentation
+      const material = new THREE.MeshLambertMaterial({ color: "#FF99CC" });
+      const cubeman = new THREE.Object3D();
+      cubeman.position.set(0, 0, 0);
+      scene.add(cubeman);
+
+      // Geometry and material for joints
+      const jGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+      const jMaterial = new THREE.ShadowMaterial(); // Change to MeshBasicMaterial to see the joints
+
+      // - Waist
+      const wGeometry = new THREE.BoxGeometry(1, 0.3, 0.3);
+      const waist = new THREE.Mesh(wGeometry, material);
+      waist.position.y = 3.9;
+      cubeman.add(waist);
+
+      // - Cheeks
+      const cheekGeometry = new THREE.BoxGeometry(0.4, 0.25, 0.2);
+      const lCheek = new THREE.Mesh(cheekGeometry, material);
+      lCheek.position.set(0.22, 0, -0.2);
+      const rCheek = new THREE.Mesh(cheekGeometry, material);
+      rCheek.position.set(-0.22, 0, -0.2);
+      waist.add(lCheek);
+      waist.add(rCheek);
+
+      // - Thighs + joints
+      const tGeometry = new THREE.BoxGeometry(0.4, 1.5, 0.4);
+      // Left
+      const lThighJoint = new THREE.Mesh(jGeometry, jMaterial);
+      lThighJoint.position.x = 0.3;
+      lThighJoint.position.z = 0.07;
+      waist.add(lThighJoint);
+      const lThigh = new THREE.Mesh(tGeometry, material);
+      lThigh.position.y = -1;
+      lThighJoint.add(lThigh);
+      // Right
+      const rThighJoint = new THREE.Mesh(jGeometry, jMaterial);
+      rThighJoint.position.x = -0.3;
+      rThighJoint.position.z = 0.07;
+      waist.add(rThighJoint);
+      const rThigh = new THREE.Mesh(tGeometry, material);
+      rThigh.position.y = -1;
+      rThighJoint.add(rThigh);
+
+      // - Lower Legs + knee joints
+      const lowerLegGeometry = new THREE.BoxGeometry(0.3, 1.5, 0.3);
+      // Left
+      const lKnee = new THREE.Mesh(jGeometry, jMaterial);
+      lKnee.position.y = -0.8;
+      lThigh.add(lKnee);
+      const lLowerLeg = new THREE.Mesh(lowerLegGeometry, material);
+      lLowerLeg.position.y = -0.8;
+      lKnee.add(lLowerLeg);
+      // Right
+      const rKnee = new THREE.Mesh(jGeometry, jMaterial);
+      rKnee.position.y = -0.8;
+      rThigh.add(rKnee);
+      const rLowerLeg = new THREE.Mesh(lowerLegGeometry, material);
+      rLowerLeg.position.y = -0.8;
+      rKnee.add(rLowerLeg);
+
+      // - Feet + ankles
+      const fGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.8);
+      // Left
+      const lAnkle = new THREE.Mesh(jGeometry, jMaterial);
+      lAnkle.position.y = -0.8;
+      lLowerLeg.add(lAnkle);
+      const lFoot = new THREE.Mesh(fGeometry, material);
+      lFoot.position.set(0, -0.2, 0.25);
+      lAnkle.add(lFoot);
+      // Right
+      const rAnkle = new THREE.Mesh(jGeometry, jMaterial);
+      rAnkle.position.y = -0.8;
+      rLowerLeg.add(rAnkle);
+      const rFoot = new THREE.Mesh(fGeometry, material);
+      rFoot.position.set(0, -0.2, 0.25);
+      rAnkle.add(rFoot);
+
+      // - Lower torso
+      // Add an extra group to allow scaling of the lower torso mesh for breath animation
+      const lowerTorsoGroup = new THREE.Object3D();
+      const lowerTorsoGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.3);
+      const lowerTorso = new THREE.Mesh(lowerTorsoGeometry, material);
+      lowerTorsoGroup.position.y = 0.85;
+      lowerTorsoGroup.position.z = 0.08;
+      waist.add(lowerTorsoGroup);
+      lowerTorsoGroup.add(lowerTorso);
+      // Abs
+      const absGeometry = new THREE.BoxGeometry(0.3, 0.1875, 0.1);
+      const lAbs1 = new THREE.Mesh(absGeometry, material);
+      const lAbs2 = new THREE.Mesh(absGeometry, material);
+      const lAbs3 = new THREE.Mesh(absGeometry, material);
+      const rAbs1 = new THREE.Mesh(absGeometry, material);
+      const rAbs2 = new THREE.Mesh(absGeometry, material);
+      const rAbs3 = new THREE.Mesh(absGeometry, material);
+      lAbs1.position.set(-0.2, -0.15, 0.2);
+      lAbs2.position.set(-0.2, 0.1, 0.2);
+      lAbs3.position.set(-0.2, 0.35, 0.2);
+      rAbs1.position.set(0.2, -0.15, 0.2);
+      rAbs2.position.set(0.2, 0.1, 0.2);
+      rAbs3.position.set(0.2, 0.35, 0.2);
+      lowerTorso.add(lAbs1);
+      lowerTorso.add(lAbs2);
+      lowerTorso.add(lAbs3);
+      lowerTorso.add(rAbs1);
+      lowerTorso.add(rAbs2);
+      lowerTorso.add(rAbs3);
+
+      // - Chest
+      // Add an extra group to allow scaling of the chest mesh for breath animation
+      const chestGroup = new THREE.Object3D();
+      const cGeometry = new THREE.BoxGeometry(1, 0.625, 0.5);
+      const chest = new THREE.Mesh(cGeometry, material);
+      chestGroup.position.y = 1;
+      lowerTorsoGroup.add(chestGroup);
+      chestGroup.add(chest);
+
+      // - Head
+      const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+      const head = new THREE.Mesh(headGeometry, material);
+      head.position.y = 0.7;
+      chestGroup.add(head);
+
+      // - Arms + shoulders + bicep
+      const aGeometry = new THREE.BoxGeometry(0.3, 1, 0.3);
+      const bicepGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+      // Left
+      const lShoulder = new THREE.Mesh(jGeometry, jMaterial);
+      lShoulder.position.set(0.75, 0.2, 0);
+      chestGroup.add(lShoulder);
+      const lArm = new THREE.Mesh(aGeometry, material);
+      lArm.position.y = -0.4;
+      lShoulder.add(lArm);
+      // Right
+      const rShoulder = new THREE.Mesh(jGeometry, jMaterial);
+      rShoulder.position.set(-0.75, 0.2, 0);
+      chestGroup.add(rShoulder);
+      const rArm = new THREE.Mesh(aGeometry, material);
+      rArm.position.y = -0.4;
+      rShoulder.add(rArm);
+      // Bicep
+      const bicep = new THREE.Mesh(bicepGeometry, material);
+      rArm.add(bicep);
+
+      // - Forearms + elbows
+      const fArmGeometry = new THREE.BoxGeometry(0.25, 1, 0.25);
+      // Left
+      const lElbow = new THREE.Mesh(jGeometry, jMaterial);
+      lElbow.position.y = -0.52;
+      lArm.add(lElbow);
+      const lForeArm = new THREE.Mesh(fArmGeometry, material);
+      lForeArm.position.y = -0.525;
+      lElbow.add(lForeArm);
+      // Right
+      const rElbow = new THREE.Mesh(jGeometry, jMaterial);
+      rElbow.position.y = -0.52;
+      rArm.add(rElbow);
+      const rForeArm = new THREE.Mesh(fArmGeometry, material);
+      rForeArm.position.y = -0.525;
+      rElbow.add(rForeArm);
+
+      // - Hands + wrists
+      const handsGeometry = new THREE.BoxGeometry(0.35, 0.3, 0.3);
+      // Left
+      const lWrist = new THREE.Mesh(jGeometry, jMaterial);
+      lWrist.position.y = -0.6;
+      lForeArm.add(lWrist);
+      const lHand = new THREE.Mesh(handsGeometry, material);
+      lHand.position.y = -0.1;
+      lWrist.add(lHand);
+      // Right
+      const rWrist = new THREE.Mesh(jGeometry, jMaterial);
+      rWrist.position.y = -0.6;
+      rForeArm.add(rWrist);
+      const rHand = new THREE.Mesh(handsGeometry, material);
+      rHand.position.y = -0.1;
+      rWrist.add(rHand);
+
+      // - Dumbell
+      const dumbellGeometry = new THREE.BoxGeometry(1, 0.15, 0.15);
+      const dumbellWheelGeometry = new THREE.BoxGeometry(0.2, 0.5, 0.5);
+      const dumbell = new THREE.Mesh(dumbellGeometry, new THREE.MeshLambertMaterial({ color: "#808080" }));
+      const lDumbellWheel = new THREE.Mesh(dumbellWheelGeometry, new THREE.MeshLambertMaterial({ color: "#333333" }));
+      const rDumbellWheel = new THREE.Mesh(dumbellWheelGeometry, new THREE.MeshLambertMaterial({ color: "#333333" }));
+      lDumbellWheel.position.x = 0.35;
+      rDumbellWheel.position.x = -0.35;
+      rHand.add(dumbell);
+      dumbell.add(lDumbellWheel);
+      dumbell.add(rDumbellWheel);
+
+      // - Bench
+      const benchGeometry = new THREE.BoxGeometry(7, 0.3, 1.5);
+      const benchLegGeometry = new THREE.BoxGeometry(0.3, 1.8, 0.3);
+      const bench = new THREE.Mesh(benchGeometry, new THREE.MeshLambertMaterial({ color: "#8D0000" }));
+      bench.position.set(0, 2, -1.5);
+      scene.add(bench);
+      // Left
+      const lBenchLeg1 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+      lBenchLeg1.position.set(-3.2, -1.05, 0.4);
+      bench.add(lBenchLeg1);
+      const lBenchLeg2 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+      lBenchLeg2.position.set(-3.2, -1.05, -0.4);
+      bench.add(lBenchLeg2);
+      // Right
+      const rBenchLeg1 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+      rBenchLeg1.position.set(3.2, -1.05, 0.4);
+      bench.add(rBenchLeg1);
+      const rBenchLeg2 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+      rBenchLeg2.position.set(3.2, -1.05, -0.4);
+      bench.add(rBenchLeg2);
+
+      /* FUNCTION DEFINITIONS */
+      // Animate CubeBro to do some bicep curls while sitting on the bench
+      let o2Level;
+      function flex() {
+        // Calculate positive sine and cos waves: from 0 to 1
+        const sWave = (Math.sin(t) + 1) / 2;
+        const cWave = (Math.cos(t) + 1) / 2;
+
+        // Position CubeBro on the bench
+        waist.position.set(0, 2.3, -0.9);
+
+        // Position the legs
+        lThighJoint.rotation.x = -Math.PI / 2;
+        lThighJoint.rotation.z = Math.PI / 6;
+        rThighJoint.rotation.x = -Math.PI / 2;
+        rThighJoint.rotation.z = -Math.PI / 6;
+        lKnee.rotation.x = Math.PI / 2;
+        rKnee.rotation.x = Math.PI / 2;
+
+        // Position the upper body
+        lowerTorsoGroup.rotation.x = Math.PI / 4;
+        lowerTorsoGroup.position.z = 0.45;
+        lowerTorsoGroup.position.y = 0.75;
+
+        // Position the left arm and animate it to move a little
+        lShoulder.position.z = 0.2;
+        lShoulder.rotation.x = -0.2 - 0.05 * cWave;
+        lShoulder.rotation.y = 0.05 - 0.05 * cWave;
+        lShoulder.rotation.z = Math.PI / 12;
+        lElbow.rotation.x = -1.65;
+        lElbow.rotation.z = -0.3;
+
+        // Bicep curl right arm animation
+        rShoulder.position.z = 0.2;
+        rShoulder.rotation.x = -Math.PI / 3.5 - 0.2 * sWave;
+        rShoulder.rotation.y = Math.PI / 4 - 0.05;
+        rElbow.rotation.x = -0.7 - sWave;
+        rWrist.rotation.x = -0.1 - 0.8 * sWave;
+
+        // - Extra animations
+        // Bicep pop-out
+        bicep.position.z = sWave * 0.1;
+        // Breathing: breath-in during eccentric movement, breath-out during concentric
+        o2Level = -0.15 * sWave;
+        chest.scale.set(1, 1, 1 + o2Level);
+        lowerTorso.scale.set(1, 1, 1 + o2Level);
+        // Slight head bobbing
+        head.rotation.x = 0.2 - 0.2 * sWave;
+      }
+
+      /* FROM PREVIOUS EXERCISES */
+      // Create a cross using a Line. `opacity` defines its opacity
+      function createCross(opacity) {
+        const material = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          opacity: opacity,
+          transparent: true,
+        });
+        const points = [];
+        points.push(new THREE.Vector3(1, 0, 0));
+        points.push(new THREE.Vector3(-1, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 1));
+        points.push(new THREE.Vector3(0, 0, -1));
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const cross = new THREE.Line(geometry, material);
+        return cross;
+      }
+
+      // Create a floor of crosses
+      function floorOfCrosses(FADE_START = 100, FADE_END = 200) {
+        /*
+        `FADE_START`:Minimum distance from center with opacity=1
+        `FADE_END`: Distance from center at which opacity=0
+        */
+        const floor = new THREE.Object3D();
+        scene.add(floor);
+        // Loop through x and z axis from -50 to +50, so that the floor center is at (0,0,0)
+        for (let x = -50; x < 50; x++) {
+          // x axis
+          for (let z = -50; z < 50; z++) {
+            // z axis
+            const x_pos = x * 10; // Scale up by 10
+            const z_pos = z * 10; // Scale up by 10
+            // Calculate distance from center to determine cross opacity. This create a fading effect in a round area around the center
+            const radius = Math.sqrt(Math.pow(x_pos, 2) + Math.pow(z_pos, 2));
+            const FADE_RANGE = FADE_END - FADE_START; // Range of progressive fade
+            let crossOpacity;
+            if (radius < FADE_START) {
+              // Show cross with full opacity when its under the minimum distance
+              crossOpacity = 1;
+            } else {
+              // Progressive opacity reduction the further from the center it is
+              const distance = radius - FADE_START; // Distance from start of fade
+              crossOpacity = 1 - distance / FADE_RANGE;
+            }
+            // Create and position the cross
+            const cross = createCross(crossOpacity);
+            cross.position.x = x_pos;
+            cross.position.z = z_pos;
+            // Add the cross to the floor as a child
+            floor.add(cross);
+          }
+        }
+      }
+
+      /* RENDER THE SCENE */
+      // Create the floor of crosses
+      floorOfCrosses(25, 50);
+
+      var t = 0;
+      var render = function () {
+        requestAnimationFrame(render);
+        controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
+
+        // Time
+        t += 0.01;
+
+        // Show off
+        flex();
+
+        // Render
+        renderer.render(scene, camera);
+      };
+
+      //   new THREE.TextGeometry("IMLEX", parameters);
+
+      render();
+    </script>
+  </body>
+</html>

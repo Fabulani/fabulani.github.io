@@ -55,8 +55,8 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
 
       // Enable XR - VR and AR buttons
-      // document.body.appendChild(VRButton.createButton(renderer));
-      document.body.appendChild(ARButton.createButton(renderer));
+      document.body.appendChild(VRButton.createButton(renderer));
+      // document.body.appendChild(ARButton.createButton(renderer));
       renderer.xr.enabled = true;
 
       var camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.01, 1000);
@@ -596,18 +596,20 @@
         time = 0;
       let clock = new THREE.Clock();
       var render = function () {
-        requestAnimationFrame(render);
-        controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
-
-        // Get delta of time
-        delta = clock.getDelta();
-        time += delta;
-
-        // Show off
-        flex(time);
-
         // Render
-        renderer.render(scene, camera);
+        renderer.setAnimationLoop(function () {
+          controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
+
+          // Get delta of time
+          delta = clock.getDelta();
+          time += delta;
+
+          // Show off
+          flex(time);
+
+          // Render
+          renderer.render(scene, camera);
+        });
       };
 
       render();

@@ -47,7 +47,7 @@
       import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
       /* Main script */
-      let camera, scene, renderer, controls;
+      let camera, globalScene, scene, renderer, controls;
 
       // Initialize empty scene with cameras and controls
       init();
@@ -63,6 +63,11 @@
       createDumbell(scene);
       createBench(scene);
       createProteinShake(scene);
+
+      // Enable shadows
+      traverse(scene.getObjectByName("cubebro"), enableShadows);
+      traverse(scene.getObjectByName("proteinShake"), enableShadows);
+      traverse(scene.getObjectByName("bench"), enableShadows);
 
       // Position CubeBro correctly for the flex animation
       prepareToFlex();
@@ -85,16 +90,23 @@
 
       // Initialize empty scene with renderer, cameras, lights, and controls
       function init() {
-        // Scene
-        scene = new THREE.Scene();
+        // Global scene
+        globalScene = new THREE.Scene();
+
+        // Scene for adjusting all entities
+        scene = new THREE.Object3D();
+        globalScene.add(scene);
+        scene.scale.set(0.5, 0.5, 0.5);
+        scene.position.z = -2;
 
         // Renderer
         renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Shadows
 
         // Cameras
         camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.01, 500);
-        camera.position.set(0, 5, 3);
+        camera.position.set(0, 2, 0);
 
         // Controls
         controls = new OrbitControls(camera, renderer.domElement);
@@ -104,25 +116,26 @@
         controls.screenSpacePanning = false;
         controls.minDistance = 0;
         controls.maxDistance = 500;
-        controls.target = new THREE.Vector3(0, 3, 0);
+        controls.target = new THREE.Vector3(0, 1, -2);
         controls.autoRotate = true;
         controls.autoRotateSpeed = 1;
 
         // Lights
         {
           const color = 0xffffff;
-          const intensity = 0.3;
+          const intensity = 0.4;
           const light = new THREE.DirectionalLight(color, intensity);
-          light.position.set(-1, 2, 4);
+          light.position.set(0, 2, 4 - scene.position.z);
           scene.add(light);
         }
         {
           const color = 0xffffff;
           const intensity = 1;
           const light = new THREE.SpotLight(color, intensity);
-          light.position.set(0, 6, 0);
+          light.position.set(0, 6, scene.position.z);
           light.rotation.set(0, 0, Math.PI);
           light.penumbra = 0.8;
+          light.castShadow = true;
           scene.add(light);
         }
 
@@ -601,7 +614,7 @@
 
         // Position the protein shake on the bench, right side
         proteinShake.position.set(2, 2.2, -1.1);
-        proteinShake.rotation.y = Math.PI / 6;
+        proteinShake.rotation.y = -Math.PI / 6;
 
         // Position CubeBro on the bench
         waist.position.set(0, 2.3, -0.9);
@@ -628,6 +641,21 @@
         // Position the right arm
         rShoulder.position.z = 0.2;
         rShoulder.rotation.y = Math.PI / 4 - 0.05;
+      }
+
+      // Traverse all children nodes of a parent node
+      function traverse(node, f) {
+        f(node);
+        node.children.forEach((nextNode) => {
+          traverse(nextNode, f);
+        });
+      }
+
+      // Enable shadows for object
+      function enableShadows(obj) {
+        // Warning: very computationally costly
+        obj.castShadow = true;
+        obj.receiveShadow = true;
       }
 
       // Animate CubeBro to do some bicep curls while sitting on the bench

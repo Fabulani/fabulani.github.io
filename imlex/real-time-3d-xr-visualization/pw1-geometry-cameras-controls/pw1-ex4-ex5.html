@@ -41,13 +41,9 @@
     <script type="module">
       import * as THREE from "three";
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-      import { AnimationClip, NumberKeyframeTrack, VectorKeyframeTrack } from "three";
-      import { Mesh, AnimationMixer } from "three";
       import { FontLoader } from "three/addons/loaders/FontLoader.js";
       import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
       import { VRButton } from "three/addons/webxr/VRButton.js";
-      import { ARButton } from "three/addons/webxr/ARButton.js";
       import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
       /* Main script */
@@ -594,9 +590,14 @@
         const lShoulder = scene.getObjectByName("lShoulder");
         const lElbow = scene.getObjectByName("lElbow");
         const rShoulder = scene.getObjectByName("rShoulder");
+        const rHand = scene.getObjectByName("rHand");
+        const dumbell = scene.getObjectByName("dumbell");
 
         // Position the bench
         bench.position.set(0, 2, -1.5);
+
+        // Position the dumbell in CubeBro's right hand
+        rHand.add(dumbell);
 
         // Position the protein shake on the bench, right side
         proteinShake.position.set(2, 2.2, -1.1);
@@ -639,7 +640,7 @@
         const rBicep = scene.getObjectByName("rBicep");
         const chest = scene.getObjectByName("chest");
         const lowerTorso = scene.getObjectByName("lowerTorso");
-        const head = scene.getObjectByName("rElbow");
+        const head = scene.getObjectByName("head");
 
         // Adjust animation speed
         const t = time * speed;

@@ -47,12 +47,16 @@
       import { FontLoader } from "three/addons/loaders/FontLoader.js";
       import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
       import { VRButton } from "three/addons/webxr/VRButton.js";
+      import { ARButton } from "three/addons/webxr/ARButton.js";
 
       var scene = new THREE.Scene();
 
       var renderer = new THREE.WebGLRenderer();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(VRButton.createButton(renderer));
+
+      // Enable XR - VR and AR buttons
+      // document.body.appendChild(VRButton.createButton(renderer));
+      document.body.appendChild(ARButton.createButton(renderer));
       renderer.xr.enabled = true;
 
       var camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.01, 1000);

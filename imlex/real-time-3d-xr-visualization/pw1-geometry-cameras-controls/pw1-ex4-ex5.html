@@ -501,11 +501,14 @@
       }
 
       // Animate CubeBro to do some bicep curls while sitting on the bench
-      function flex(time) {
+      function flex(time, speed) {
+        // Adjust animation speed
+        const t = time * speed;
+
         // `time`: used to determine which point is the animation at
         // Calculate positive sine and cos waves: from 0 to 1
-        const sWave = (Math.sin(time) + 1) / 2;
-        const cWave = (Math.cos(time) + 1) / 2;
+        const sWave = (Math.sin(t) + 1) / 2;
+        const cWave = (Math.cos(t) + 1) / 2;
 
         // Bicep curl right arm animation
         rShoulder.rotation.x = -Math.PI / 3.5 - 0.2 * sWave;
@@ -591,25 +594,16 @@
       // Position CubeBro correctly for the flex animation
       prepareToFlex();
 
-      // Render the animations
-      let delta,
-        time = 0;
-      let clock = new THREE.Clock();
-
-      var render = function () {
+      function render(time) {
         // Update controls
         controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
 
-        // Get delta of time
-        delta = clock.getDelta();
-        time += delta;
-
         // Show off
-        flex(time);
+        flex(time, 0.002);
 
         // Render
         renderer.render(scene, camera);
-      };
+      }
 
       renderer.setAnimationLoop(render);
 

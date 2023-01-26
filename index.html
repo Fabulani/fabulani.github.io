@@ -44,6 +44,7 @@
       import { FontLoader } from "three/addons/loaders/FontLoader.js";
       import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
       import { VRButton } from "three/addons/webxr/VRButton.js";
+      import { ARButton } from "three/addons/webxr/ARButton.js";
       import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
       /* Main script */
@@ -705,7 +706,8 @@
         renderer.xr.enabled = true;
 
         // Add XR button
-        document.body.appendChild(VRButton.createButton(renderer));
+        // document.body.appendChild(VRButton.createButton(renderer));
+        document.body.appendChild(ARButton.createButton(renderer));
 
         // Controller setup
         const geometry = new THREE.BufferGeometry();

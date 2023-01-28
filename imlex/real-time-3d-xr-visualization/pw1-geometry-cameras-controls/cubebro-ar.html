@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>CubeBro</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #c {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      #info {
+        position: absolute;
+        top: 10px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { FontLoader } from "three/addons/loaders/FontLoader.js";
+      import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+      import { VRButton } from "three/addons/webxr/VRButton.js";
+      import { ARButton } from "three/addons/webxr/ARButton.js";
+      import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+
+      /* Main script */
+      let camera, globalScene, scene, renderer, controls;
+
+      // Initialize empty scene with cameras and controls
+      init();
+
+      // Enable VR
+      setupVR();
+
+      // Create the floor of crosses
+      floorOfCrosses(25, 50);
+
+      // Create scene entities
+      createCubeBro(scene);
+      createDumbell(scene);
+      createBench(scene);
+      createProteinShake(scene);
+
+      // Enable shadows
+      traverse(scene.getObjectByName("cubebro"), enableShadows);
+      traverse(scene.getObjectByName("proteinShake"), enableShadows);
+      traverse(scene.getObjectByName("bench"), enableShadows);
+
+      // Position CubeBro correctly for the flex animation
+      prepareToFlex();
+
+      // Add text to the scene
+      addText();
+
+      // Render with setAnimationLoop for XR compatibility
+      renderer.setAnimationLoop(function (time) {
+        // Update controls
+        controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
+
+        // Show off
+        flex(time, 0.002);
+
+        // Render
+        renderer.render(scene, camera);
+      });
+      /* End of main script */
+
+      // Initialize empty scene with renderer, cameras, lights, and controls
+      function init() {
+        // Global scene
+        globalScene = new THREE.Scene();
+
+        // Scene for adjusting all entities
+        scene = new THREE.Object3D();
+        globalScene.add(scene);
+        scene.scale.set(0.5, 0.5, 0.5);
+        scene.position.z = -2;
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Shadows
+
+        // Cameras
+        camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.01, 500);
+        camera.position.set(0, 2, 0);
+
+        // Controls
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.listenToKeyEvents(window); // optional
+        controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 0;
+        controls.maxDistance = 500;
+        controls.target = new THREE.Vector3(0, 1, -2);
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 1;
+
+        // Lights
+        {
+          const color = 0xffffff;
+          const intensity = 0.4;
+          const light = new THREE.DirectionalLight(color, intensity);
+          light.position.set(0, 2, 4 - scene.position.z);
+          scene.add(light);
+        }
+        {
+          const color = 0xffffff;
+          const intensity = 1;
+          const light = new THREE.SpotLight(color, intensity);
+          light.position.set(0, 6, scene.position.z);
+          light.rotation.set(0, 0, Math.PI);
+          light.penumbra = 0.8;
+          light.castShadow = true;
+          scene.add(light);
+        }
+
+        // Additional setup
+        document.body.appendChild(renderer.domElement);
+
+        // Window resize fix
+        window.addEventListener("resize", onWindowResize);
+      }
+
+      /* CREATE THE CUBEBRO MODEL USING PRIMITIVE CUBES */
+      function createCubeBro(parent, name = "cubebro") {
+        // Scene graph based on the Three.js Scene Graph documentation
+        const material = new THREE.MeshLambertMaterial({ color: "#FF99CC" });
+        const cubebro = new THREE.Object3D();
+        cubebro.name = name;
+        parent.add(cubebro);
+
+        // Geometry and material for joints
+        const jGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        const jMaterial = new THREE.ShadowMaterial(); // Change to MeshBasicMaterial to see the joints
+
+        // - Waist
+        const wGeometry = new THREE.BoxGeometry(1, 0.3, 0.3);
+        const waist = new THREE.Mesh(wGeometry, material);
+        waist.position.y = 3.9;
+        waist.name = "waist";
+        cubebro.add(waist);
+
+        // - Cheeks
+        const cheekGeometry = new THREE.BoxGeometry(0.4, 0.25, 0.2);
+        const lCheek = new THREE.Mesh(cheekGeometry, material);
+        lCheek.position.set(0.22, 0, -0.2);
+        lCheek.name = "lCheek";
+        const rCheek = new THREE.Mesh(cheekGeometry, material);
+        rCheek.position.set(-0.22, 0, -0.2);
+        rCheek.name = "rCheek";
+        waist.add(lCheek);
+        waist.add(rCheek);
+
+        // - Thighs + joints
+        const tGeometry = new THREE.BoxGeometry(0.4, 1.5, 0.4);
+        // Left
+        const lThighJoint = new THREE.Mesh(jGeometry, jMaterial);
+        lThighJoint.position.x = 0.3;
+        lThighJoint.position.z = 0.07;
+        lThighJoint.name = "lThighJoint";
+        const lThigh = new THREE.Mesh(tGeometry, material);
+        lThigh.position.y = -1;
+        lThigh.name = "lThigh";
+        waist.add(lThighJoint);
+        lThighJoint.add(lThigh);
+        // Right
+        const rThighJoint = new THREE.Mesh(jGeometry, jMaterial);
+        rThighJoint.position.x = -0.3;
+        rThighJoint.position.z = 0.07;
+        rThighJoint.name = "rThighJoint";
+        const rThigh = new THREE.Mesh(tGeometry, material);
+        rThigh.position.y = -1;
+        rThigh.name = "rThigh";
+        waist.add(rThighJoint);
+        rThighJoint.add(rThigh);
+
+        // - Lower Legs + knee joints
+        const lowerLegGeometry = new THREE.BoxGeometry(0.3, 1.5, 0.3);
+        // Left
+        const lKnee = new THREE.Mesh(jGeometry, jMaterial);
+        lKnee.position.y = -0.8;
+        lKnee.name = "lKnee";
+        const lLowerLeg = new THREE.Mesh(lowerLegGeometry, material);
+        lLowerLeg.position.y = -0.8;
+        lLowerLeg.name = "lLowerLeg";
+        lThigh.add(lKnee);
+        lKnee.add(lLowerLeg);
+        // Right
+        const rKnee = new THREE.Mesh(jGeometry, jMaterial);
+        rKnee.position.y = -0.8;
+        rKnee.name = "rKnee";
+        const rLowerLeg = new THREE.Mesh(lowerLegGeometry, material);
+        rLowerLeg.position.y = -0.8;
+        rLowerLeg.name = "rLowerLeg";
+        rThigh.add(rKnee);
+        rKnee.add(rLowerLeg);
+
+        // - Feet + ankles
+        const fGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.8);
+        // Left
+        const lAnkle = new THREE.Mesh(jGeometry, jMaterial);
+        lAnkle.position.y = -0.8;
+        lAnkle.name = "lAnkle";
+        const lFoot = new THREE.Mesh(fGeometry, material);
+        lFoot.position.set(0, -0.2, 0.25);
+        lFoot.name = "lFoot";
+        lLowerLeg.add(lAnkle);
+        lAnkle.add(lFoot);
+        // Right
+        const rAnkle = new THREE.Mesh(jGeometry, jMaterial);
+        rAnkle.position.y = -0.8;
+        rAnkle.name = "rAnkle";
+        const rFoot = new THREE.Mesh(fGeometry, material);
+        rFoot.position.set(0, -0.2, 0.25);
+        rFoot.name = "rFoot";
+        rLowerLeg.add(rAnkle);
+        rAnkle.add(rFoot);
+
+        // - Lower torso
+        // Add an extra group to allow scaling of the lower torso mesh for breath animation
+        const lowerTorsoGroup = new THREE.Object3D();
+        const lowerTorsoGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.3);
+        const lowerTorso = new THREE.Mesh(lowerTorsoGeometry, material);
+        lowerTorso.name = "lowerTorso";
+        lowerTorsoGroup.position.y = 0.85;
+        lowerTorsoGroup.position.z = 0.08;
+        lowerTorsoGroup.name = "lowerTorsoGroup";
+        waist.add(lowerTorsoGroup);
+        lowerTorsoGroup.add(lowerTorso);
+        // Abs
+        const absGeometry = new THREE.BoxGeometry(0.3, 0.1875, 0.1);
+        const lAbs1 = new THREE.Mesh(absGeometry, material);
+        const lAbs2 = new THREE.Mesh(absGeometry, material);
+        const lAbs3 = new THREE.Mesh(absGeometry, material);
+        const rAbs1 = new THREE.Mesh(absGeometry, material);
+        const rAbs2 = new THREE.Mesh(absGeometry, material);
+        const rAbs3 = new THREE.Mesh(absGeometry, material);
+        lAbs1.position.set(-0.2, -0.15, 0.2);
+        lAbs2.position.set(-0.2, 0.1, 0.2);
+        lAbs3.position.set(-0.2, 0.35, 0.2);
+        rAbs1.position.set(0.2, -0.15, 0.2);
+        rAbs2.position.set(0.2, 0.1, 0.2);
+        rAbs3.position.set(0.2, 0.35, 0.2);
+        lowerTorso.add(lAbs1);
+        lowerTorso.add(lAbs2);
+        lowerTorso.add(lAbs3);
+        lowerTorso.add(rAbs1);
+        lowerTorso.add(rAbs2);
+        lowerTorso.add(rAbs3);
+
+        // - Chest
+        // Add an extra group to allow scaling of the chest mesh for breath animation
+        const chestGroup = new THREE.Object3D();
+        const cGeometry = new THREE.BoxGeometry(1, 0.625, 0.5);
+        const chest = new THREE.Mesh(cGeometry, material);
+        chest.name = "chest";
+        chestGroup.position.y = 1;
+        chestGroup.name = "chestGroup";
+        lowerTorsoGroup.add(chestGroup);
+        chestGroup.add(chest);
+
+        // - Head
+        const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const head = new THREE.Mesh(headGeometry, material);
+        head.position.y = 0.7;
+        head.name = "head";
+        chestGroup.add(head);
+
+        // - Arms + shoulders + bicep
+        const aGeometry = new THREE.BoxGeometry(0.3, 1, 0.3);
+        // Left
+        const lShoulder = new THREE.Mesh(jGeometry, jMaterial);
+        lShoulder.position.set(0.75, 0.2, 0);
+        lShoulder.name = "lShoulder";
+        chestGroup.add(lShoulder);
+
+        const lArm = new THREE.Mesh(aGeometry, material);
+        lArm.position.y = -0.4;
+        lArm.name = "lArm";
+        lShoulder.add(lArm);
+
+        // Right
+        const rShoulder = new THREE.Mesh(jGeometry, jMaterial);
+        rShoulder.position.set(-0.75, 0.2, 0);
+        rShoulder.name = "rShoulder";
+        chestGroup.add(rShoulder);
+
+        const rArm = new THREE.Mesh(aGeometry, material);
+        rArm.position.y = -0.4;
+        rArm.name = "rArm";
+        rShoulder.add(rArm);
+
+        // Bicep
+        const bicepGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+        const rBicep = new THREE.Mesh(bicepGeometry, material);
+        rBicep.name = "rBicep";
+        rArm.add(rBicep);
+
+        // - Forearms + elbows
+        const fArmGeometry = new THREE.BoxGeometry(0.25, 1, 0.25);
+        // Left
+        const lElbow = new THREE.Mesh(jGeometry, jMaterial);
+        lElbow.position.y = -0.52;
+        lElbow.name = "lElbow";
+        lArm.add(lElbow);
+
+        const lForeArm = new THREE.Mesh(fArmGeometry, material);
+        lForeArm.position.y = -0.525;
+        lForeArm.name = "lForeArm";
+        lElbow.add(lForeArm);
+
+        // Right
+        const rElbow = new THREE.Mesh(jGeometry, jMaterial);
+        rElbow.position.y = -0.52;
+        rElbow.name = "rElbow";
+        rArm.add(rElbow);
+
+        const rForeArm = new THREE.Mesh(fArmGeometry, material);
+        rForeArm.position.y = -0.525;
+        rForeArm.name = "rForeArm";
+        rElbow.add(rForeArm);
+
+        // - Hands + wrists
+        const handsGeometry = new THREE.BoxGeometry(0.35, 0.3, 0.3);
+        // Left
+        const lWrist = new THREE.Mesh(jGeometry, jMaterial);
+        lWrist.position.y = -0.6;
+        lWrist.name = "lWrist";
+        lForeArm.add(lWrist);
+
+        const lHand = new THREE.Mesh(handsGeometry, material);
+        lHand.position.y = -0.1;
+        lHand.name = "lHand";
+        lWrist.add(lHand);
+
+        // Right
+        const rWrist = new THREE.Mesh(jGeometry, jMaterial);
+        rWrist.position.y = -0.6;
+        rWrist.name = "rWrist";
+        rForeArm.add(rWrist);
+
+        const rHand = new THREE.Mesh(handsGeometry, material);
+        rHand.position.y = -0.1;
+        rHand.name = "rHand";
+        rWrist.add(rHand);
+      }
+
+      function createDumbell(parent, name = "dumbell") {
+        // - Dumbell
+        const dumbellGeometry = new THREE.BoxGeometry(1, 0.15, 0.15);
+        const dumbellWheelGeometry = new THREE.BoxGeometry(0.2, 0.5, 0.5);
+        const dumbell = new THREE.Mesh(dumbellGeometry, new THREE.MeshLambertMaterial({ color: "#808080" }));
+        const lDumbellWheel = new THREE.Mesh(dumbellWheelGeometry, new THREE.MeshLambertMaterial({ color: "#333333" }));
+        const rDumbellWheel = new THREE.Mesh(dumbellWheelGeometry, new THREE.MeshLambertMaterial({ color: "#333333" }));
+        lDumbellWheel.position.x = 0.35;
+        rDumbellWheel.position.x = -0.35;
+        dumbell.name = name;
+        parent.add(dumbell);
+        dumbell.add(lDumbellWheel);
+        dumbell.add(rDumbellWheel);
+      }
+
+      function createBench(parent, name = "bench") {
+        // - Bench
+        const benchGeometry = new THREE.BoxGeometry(7, 0.3, 1.5);
+        const benchLegGeometry = new THREE.BoxGeometry(0.3, 1.8, 0.3);
+        const bench = new THREE.Mesh(benchGeometry, new THREE.MeshLambertMaterial({ color: "#8D0000" }));
+        bench.name = name;
+
+        // Left
+        const lBenchLeg1 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+        lBenchLeg1.position.set(-3.2, -1.05, 0.4);
+        const lBenchLeg2 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+        lBenchLeg2.position.set(-3.2, -1.05, -0.4);
+
+        // Right
+        const rBenchLeg1 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+        rBenchLeg1.position.set(3.2, -1.05, 0.4);
+        const rBenchLeg2 = new THREE.Mesh(benchLegGeometry, new THREE.MeshLambertMaterial({ color: "#606060" }));
+        rBenchLeg2.position.set(3.2, -1.05, -0.4);
+
+        // Fix legs to the bench
+        bench.add(lBenchLeg1);
+        bench.add(lBenchLeg2);
+        bench.add(rBenchLeg1);
+        bench.add(rBenchLeg2);
+
+        // Add bench to parent
+        parent.add(bench);
+      }
+
+      function createProteinShake(parent, name = "proteinShake") {
+        // Relative geometries
+        const shakeDimensions = [0.3, 1, 0.3];
+        const shakeGeometry = new THREE.BoxGeometry(shakeDimensions[0], shakeDimensions[1], shakeDimensions[2]);
+        const shakeCapGeometry = new THREE.BoxGeometry(
+          1.1 * shakeDimensions[0],
+          0.2 * shakeDimensions[1],
+          1.1 * shakeDimensions[2]
+        );
+        const shakeBeakGeometry = new THREE.BoxGeometry(
+          0.4 * shakeDimensions[0],
+          0.1 * shakeDimensions[1],
+          0.2 * shakeDimensions[2]
+        );
+        const shakeLiquidGeometry = new THREE.BoxGeometry(
+          0.95 * shakeDimensions[0],
+          0.6 * shakeDimensions[1],
+          0.95 * shakeDimensions[2]
+        );
+
+        // Materials
+        const shakeMaterial = new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.75, color: "#ffffff" });
+        const shakeCapMaterial = new THREE.MeshLambertMaterial({ color: "#808080" });
+        const shakeLiquidMaterial = new THREE.MeshLambertMaterial({ color: "#7B3F00" });
+
+        // Meshes
+        const proteinShake = new THREE.Mesh(shakeGeometry, shakeMaterial);
+        const proteinShakeCap = new THREE.Mesh(shakeCapGeometry, shakeCapMaterial);
+        const proteinShakeBeak = new THREE.Mesh(shakeBeakGeometry, shakeCapMaterial);
+        const proteinLiquid = new THREE.Mesh(shakeLiquidGeometry, shakeLiquidMaterial);
+
+        // Group all into the Protein Shake Group
+        const proteinShakeGroup = new THREE.Object3D();
+        proteinShakeGroup.add(proteinShake);
+        proteinShakeGroup.add(proteinShakeBeak);
+        proteinShakeGroup.add(proteinShakeCap);
+        proteinShakeGroup.add(proteinLiquid);
+
+        // Position protein shake components
+        proteinShake.position.y = 0.5;
+        proteinShakeCap.position.y = 1;
+        proteinShakeBeak.position.set(0, 1.15, 0.08);
+        proteinLiquid.position.y = 0.31;
+
+        // Name the protein shake
+        proteinShakeGroup.name = name;
+
+        // Add the protein shake to its parent
+        parent.add(proteinShakeGroup);
+      }
+
+      // Add text to the scene
+      function addText() {
+        const loader = new FontLoader();
+        // promisify font loading
+        function loadFont(url) {
+          return new Promise((resolve, reject) => {
+            loader.load(url, resolve, undefined, reject);
+          });
+        }
+        async function doit() {
+          const font = await loadFont("https://threejs.org/examples/fonts/helvetiker_regular.typeface.json");
+          const IMLEX = new TextGeometry("I M L E X", {
+            font: font,
+            size: 0.08,
+            height: 0.01,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.005,
+            bevelSize: 0.005,
+            bevelSegments: 2,
+          });
+          const TWENTYTWO = new TextGeometry("' 2 2", {
+            font: font,
+            size: 0.08,
+            height: 0.01,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.005,
+            bevelSize: 0.005,
+            bevelSegments: 2,
+          });
+          const COHORT = new TextGeometry("C O H O R T", {
+            font: font,
+            size: 0.08,
+            height: 0.01,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.005,
+            bevelSize: 0.005,
+            bevelSegments: 2,
+          });
+
+          const THREEDREALTIME = new TextGeometry("R E A L  T I M E  3 D - X R  V I S U A L I Z A T I O N", {
+            font: font,
+            size: 0.2,
+            height: 0.01,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.005,
+            bevelSize: 0.005,
+            bevelSegments: 2,
+          });
+          const cubebroTextGeometry = new TextGeometry("C U B E B R O", {
+            font: font,
+            size: 0.2,
+            height: 0.01,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.005,
+            bevelSize: 0.005,
+            bevelSegments: 2,
+          });
+          const byTextGeometry = new TextGeometry("B Y  F A B I A N O  J .  M .  M A N S C H E I N", {
+            font: font,
+            size: 0.15,
+            height: 0.02,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 0.005,
+            bevelSize: 0.005,
+            bevelSegments: 2,
+          });
+          const blackTatsMaterial = new THREE.MeshBasicMaterial({
+            color: "#303234",
+          });
+          const blackERTatsMaterial = new THREE.MeshBasicMaterial({
+            color: "#000000",
+          });
+          const yellowTatsMaterial = new THREE.MeshBasicMaterial({
+            color: "#423500",
+          });
+          const whiteMaterial = new THREE.MeshLambertMaterial({
+            color: "#ffffff",
+          });
+
+          // Create all the text meshes
+          const tatsIMLEX = new THREE.Mesh(IMLEX, blackERTatsMaterial);
+          const tats22 = new THREE.Mesh(TWENTYTWO, yellowTatsMaterial);
+          const tatsCOHORT = new THREE.Mesh(COHORT, blackERTatsMaterial);
+          const textTHREED = new THREE.Mesh(THREEDREALTIME, whiteMaterial);
+          const textCubebro = new THREE.Mesh(cubebroTextGeometry, whiteMaterial);
+          const textBy = new THREE.Mesh(byTextGeometry, whiteMaterial);
+
+          // Tattoos group for the back tattoos
+          const tattoos = new THREE.Object3D();
+
+          // Fix the tattoos position so they show on CubeBro's back
+          tattoos.position.set(0.5, 0.1, -0.25);
+          tattoos.rotation.y = Math.PI;
+
+          // Adjust text positions and rotations
+          tatsIMLEX.position.set(0.3, 0, 0);
+          tats22.position.set(0.05, -0.15, 0);
+          tatsCOHORT.position.set(0.35, -0.15, 0);
+          textTHREED.position.set(-3.2, 2.2, -1.8);
+          textTHREED.rotation.x = -Math.PI / 2;
+          textCubebro.position.set(-3.2, 2.2, -1.3);
+          textCubebro.rotation.x = -Math.PI / 2;
+          textBy.position.set(-3.2, 1.92, -0.7);
+
+          // Add tattoos
+          scene.getObjectByName("chest").add(tattoos);
+          tattoos.add(tatsIMLEX);
+          tattoos.add(tats22);
+          tattoos.add(tatsCOHORT);
+
+          // Text on the bench
+          scene.add(textTHREED);
+          scene.add(textCubebro);
+          scene.add(textBy);
+        }
+        doit();
+      }
+
+      // Position all elements in the scene
+      function prepareToFlex() {
+        // Get necessary references
+        const bench = scene.getObjectByName("bench");
+        const proteinShake = scene.getObjectByName("proteinShake");
+        const waist = scene.getObjectByName("waist");
+        const lThighJoint = scene.getObjectByName("lThighJoint");
+        const rThighJoint = scene.getObjectByName("rThighJoint");
+        const lKnee = scene.getObjectByName("lKnee");
+        const rKnee = scene.getObjectByName("rKnee");
+        const lowerTorsoGroup = scene.getObjectByName("lowerTorsoGroup");
+        const lShoulder = scene.getObjectByName("lShoulder");
+        const lElbow = scene.getObjectByName("lElbow");
+        const rShoulder = scene.getObjectByName("rShoulder");
+        const rHand = scene.getObjectByName("rHand");
+        const dumbell = scene.getObjectByName("dumbell");
+
+        // Position the bench
+        bench.position.set(0, 2, -1.5);
+
+        // Position the dumbell in CubeBro's right hand
+        rHand.add(dumbell);
+
+        // Position the protein shake on the bench, right side
+        proteinShake.position.set(2, 2.2, -1.1);
+        proteinShake.rotation.y = -Math.PI / 6;
+
+        // Position CubeBro on the bench
+        waist.position.set(0, 2.3, -0.9);
+
+        // Position the legs
+        lThighJoint.rotation.x = -Math.PI / 2;
+        lThighJoint.rotation.z = Math.PI / 6;
+        rThighJoint.rotation.x = -Math.PI / 2;
+        rThighJoint.rotation.z = -Math.PI / 6;
+        lKnee.rotation.x = Math.PI / 2;
+        rKnee.rotation.x = Math.PI / 2;
+
+        // Position the upper body
+        lowerTorsoGroup.rotation.x = Math.PI / 4;
+        lowerTorsoGroup.position.z = 0.45;
+        lowerTorsoGroup.position.y = 0.75;
+
+        // Position the left arm
+        lShoulder.position.z = 0.2;
+        lShoulder.rotation.z = Math.PI / 12;
+        lElbow.rotation.x = -1.65;
+        lElbow.rotation.z = -0.3;
+
+        // Position the right arm
+        rShoulder.position.z = 0.2;
+        rShoulder.rotation.y = Math.PI / 4 - 0.05;
+      }
+
+      // Traverse all children nodes of a parent node
+      function traverse(node, f) {
+        f(node);
+        node.children.forEach((nextNode) => {
+          traverse(nextNode, f);
+        });
+      }
+
+      // Enable shadows for object
+      function enableShadows(obj) {
+        // Warning: very computationally costly
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+
+      // Animate CubeBro to do some bicep curls while sitting on the bench
+      function flex(time, speed) {
+        // Get necessary references
+        const rShoulder = scene.getObjectByName("rShoulder");
+        const rElbow = scene.getObjectByName("rElbow");
+        const rWrist = scene.getObjectByName("rWrist");
+        const lShoulder = scene.getObjectByName("lShoulder");
+        const rBicep = scene.getObjectByName("rBicep");
+        const chest = scene.getObjectByName("chest");
+        const lowerTorso = scene.getObjectByName("lowerTorso");
+        const head = scene.getObjectByName("head");
+
+        // Adjust animation speed
+        const t = time * speed;
+
+        // `time`: used to determine which point is the animation at
+        // Calculate positive sine and cos waves: from 0 to 1
+        const sWave = (Math.sin(t) + 1) / 2;
+        const cWave = (Math.cos(t) + 1) / 2;
+
+        // Bicep curl right arm animation
+        rShoulder.rotation.x = -Math.PI / 3.5 - 0.2 * sWave;
+        rElbow.rotation.x = -0.7 - sWave;
+        rWrist.rotation.x = -0.1 - 0.8 * sWave;
+
+        // Animate the left arm to move a little
+        lShoulder.rotation.x = -0.2 - 0.05 * cWave;
+        lShoulder.rotation.y = 0.05 - 0.05 * cWave;
+
+        // Bicep pop-out
+        rBicep.position.z = sWave * 0.1;
+
+        // Breathing: breath-in during eccentric movement, breath-out during concentric
+        const o2Level = -0.15 * sWave;
+        chest.scale.set(1, 1, 1 + o2Level);
+        lowerTorso.scale.set(1, 1, 1 + o2Level);
+
+        // Slight head bobbing
+        head.rotation.x = 0.2 - 0.2 * sWave;
+      }
+
+      // Setup VR
+      function setupVR() {
+        // Enable XR
+        renderer.xr.enabled = true;
+
+        // Add XR button
+        // document.body.appendChild(VRButton.createButton(renderer));
+        document.body.appendChild(ARButton.createButton(renderer));
+
+        // Controller setup
+        const geometry = new THREE.BufferGeometry();
+        geometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)]);
+        const controller1 = renderer.xr.getController(0);
+        controller1.add(new THREE.Line(geometry));
+        scene.add(controller1);
+        const controller2 = renderer.xr.getController(1);
+        controller2.add(new THREE.Line(geometry));
+        scene.add(controller2);
+        const controllerModelFactory = new XRControllerModelFactory();
+        const controllerGrip1 = renderer.xr.getControllerGrip(0);
+        controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+        scene.add(controllerGrip1);
+        const controllerGrip2 = renderer.xr.getControllerGrip(1);
+        controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+        scene.add(controllerGrip2);
+      }
+
+      /* FROM PREVIOUS EXERCISES */
+      // Fix window resize
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // Create a cross using a Line. `opacity` defines its opacity
+      function createCross(opacity) {
+        const material = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          opacity: opacity,
+          transparent: true,
+        });
+        const points = [];
+        points.push(new THREE.Vector3(1, 0, 0));
+        points.push(new THREE.Vector3(-1, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 1));
+        points.push(new THREE.Vector3(0, 0, -1));
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const cross = new THREE.Line(geometry, material);
+        return cross;
+      }
+
+      // Create a floor of crosses
+      function floorOfCrosses(FADE_START = 100, FADE_END = 200) {
+        /*
+        `FADE_START`:Minimum distance from center with opacity=1
+        `FADE_END`: Distance from center at which opacity=0
+        */
+        const floor = new THREE.Object3D();
+        scene.add(floor);
+        // Loop through x and z axis from -50 to +50, so that the floor center is at (0,0,0)
+        for (let x = -50; x < 50; x++) {
+          // x axis
+          for (let z = -50; z < 50; z++) {
+            // z axis
+            const x_pos = x * 10; // Scale up by 10
+            const z_pos = z * 10; // Scale up by 10
+            // Calculate distance from center to determine cross opacity. This create a fading effect in a round area around the center
+            const radius = Math.sqrt(Math.pow(x_pos, 2) + Math.pow(z_pos, 2));
+            const FADE_RANGE = FADE_END - FADE_START; // Range of progressive fade
+            let crossOpacity;
+            if (radius < FADE_START) {
+              // Show cross with full opacity when its under the minimum distance
+              crossOpacity = 1;
+            } else {
+              // Progressive opacity reduction the further from the center it is
+              const distance = radius - FADE_START; // Distance from start of fade
+              crossOpacity = 1 - distance / FADE_RANGE;
+            }
+            // Create and position the cross
+            const cross = createCross(crossOpacity);
+            cross.position.x = x_pos;
+            cross.position.z = z_pos;
+            // Add the cross to the floor as a child
+            floor.add(cross);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>Cornel Box</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      #c {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      #info {
+        position: absolute;
+        top: 10px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.148.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.148.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { FontLoader } from "three/addons/loaders/FontLoader.js";
+      import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
+      import { VRButton } from "three/addons/webxr/VRButton.js";
+      import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+
+      /* Main script */
+      let camera, globalScene, scene, renderer, controls;
+
+      // Initialize empty scene with cameras and controls
+      init();
+
+      // Enable VR
+      // setupVR();
+
+      // Create the floor of crosses
+      floorOfCrosses(25, 50);
+
+      // Create scene entities
+      const cornelBox = createCornelBox();
+      scene.add(cornelBox);
+
+      //! DEBUG ONLY: make everything transparent
+      // traverse(cornelBox, enableTransparency);
+
+      // Enable shadows
+      // traverse(scene.getObjectByName("cubebro"), enableShadows);
+
+      // Render with setAnimationLoop for XR compatibility
+      renderer.setAnimationLoop(function (time) {
+        // Update controls
+        controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
+
+        // Conel box wall animation
+        animateCornelBox();
+
+        // Render
+        renderer.render(scene, camera);
+      });
+      /* End of main script */
+
+      // Initialize empty scene with renderer, cameras, lights, and controls
+      function init() {
+        // Global scene
+        scene = new THREE.Scene();
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Shadows
+
+        // Cameras
+        camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.01, 500);
+        camera.position.set(0, 1.5, 2.5);
+
+        // Controls
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.listenToKeyEvents(window); // optional
+        controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 0;
+        controls.maxDistance = 500;
+        controls.target = new THREE.Vector3(0, 1, 0);
+        // controls.autoRotate = true;
+        controls.autoRotateSpeed = 1;
+
+        // Lights
+        {
+          const color = 0xffffff;
+          const intensity = 1;
+          const light = new THREE.DirectionalLight(color, intensity);
+          light.position.set(0, 5, 5);
+          const helper = new THREE.DirectionalLightHelper(light, 5);
+          scene.add(helper);
+          scene.add(light);
+        }
+        {
+          const color = 0xffffff;
+          const intensity = 1;
+          const light = new THREE.DirectionalLight(color, intensity);
+          light.position.set(0, 5, -5);
+          const helper = new THREE.DirectionalLightHelper(light, 5);
+          scene.add(helper);
+          scene.add(light);
+        }
+
+        // Additional setup
+        document.body.appendChild(renderer.domElement);
+
+        // Window resize fix
+        window.addEventListener("resize", onWindowResize);
+      }
+
+      // Create a frame piece (metallic lengthy component with fringes)
+      function createFramePiece(length) {
+        // Create the frame piece group.
+        const framePiece = new THREE.Object3D();
+
+        // Create the materials
+        const material = new THREE.MeshLambertMaterial({ color: "#AAAFBA" });
+        const fillerMaterial = new THREE.MeshLambertMaterial({ color: "#373737" });
+
+        // Create the corners (perspective: top-view).
+        const cornerWidth = 0.21875; // Calculated to sum-up with centers and fringes to 1
+        const cornerGeometry = new THREE.BoxGeometry(cornerWidth, length, cornerWidth);
+        const bLeftCorner = new THREE.Mesh(cornerGeometry, material);
+        const bRightCorner = bLeftCorner.clone();
+        const tLeftCorner = bLeftCorner.clone();
+        const tRightCorner = bLeftCorner.clone();
+
+        // Create the centers
+        const centerWidth = cornerWidth * 2;
+        const centerGeometry = new THREE.BoxGeometry(cornerWidth * 2, length, 1);
+        const frontCenter = new THREE.Mesh(centerGeometry, material);
+        const sideCenter = new THREE.Mesh(centerGeometry, material);
+
+        // Create the filler
+        const fillerWidth = 1 - cornerWidth;
+        const fillerGeometry = new THREE.BoxGeometry(fillerWidth, length - 0.001, fillerWidth);
+        const filler = new THREE.Mesh(fillerGeometry, fillerMaterial);
+
+        // Position the corners
+        const cornerPos = 0.5 - cornerWidth / 2;
+        bLeftCorner.position.set(-cornerPos, length / 2, cornerPos);
+        bRightCorner.position.set(cornerPos, length / 2, cornerPos);
+        tLeftCorner.position.set(-cornerPos, length / 2, -cornerPos);
+        tRightCorner.position.set(cornerPos, length / 2, -cornerPos);
+
+        // Position the centers
+        frontCenter.position.y = length / 2;
+        sideCenter.position.y = length / 2;
+        sideCenter.rotation.y = Math.PI / 2;
+
+        // Position the filler
+        filler.position.y = length / 2;
+
+        // Add corners, centers, and filler to the frame piece
+        framePiece.add(bLeftCorner);
+        framePiece.add(bRightCorner);
+        framePiece.add(tLeftCorner);
+        framePiece.add(tRightCorner);
+        framePiece.add(frontCenter);
+        framePiece.add(sideCenter);
+        framePiece.add(filler);
+        return framePiece;
+      }
+
+      // Create one face of the cornel box
+      function createCornelFace() {
+        // Create the face group
+        const face = new THREE.Object3D();
+
+        // Create the face components
+        const framePiece = createFramePiece(2);
+
+        // Add components to the face
+        face.add(framePiece);
+
+        return face;
+      }
+
+      // Create the roof for the cornel box
+      function createCornelRoof() {
+        const geometry = new THREE.BoxGeometry(1, 0.2, 1);
+        const material = new THREE.MeshNormalMaterial();
+        const roof = new THREE.Mesh(geometry, material);
+        return roof;
+      }
+
+      // Create a cornel box based on the Telelumen lighting system present in the IXR platform in UJM
+      function createCornelBox(name = "cornelBox") {
+        // Create the cornel box group
+        const cornelBox = new THREE.Object3D();
+
+        // Create the cornel box faces
+        const frontFace = createCornelFace();
+        const leftFace = frontFace.clone();
+        const rightFace = frontFace.clone();
+        const backFace = frontFace.clone();
+
+        // Create the cornel box roof
+        const roof = createCornelRoof();
+
+        // Position the cornel box elements
+        frontFace.position.z = -1;
+        leftFace.position.x = -1;
+        rightFace.position.x = 1;
+        backFace.position.z = 1;
+        roof.position.y = 2;
+
+        // Rotate cornel box elements
+        leftFace.rotation.y = -Math.PI / 2;
+        rightFace.rotation.y = Math.PI / 2;
+
+        // Scene graph: build the scene here
+        cornelBox.add(frontFace);
+        // cornelBox.add(leftFace);
+        // cornelBox.add(rightFace);
+        // cornelBox.add(backFace);
+        // cornelBox.add(roof);
+
+        return cornelBox;
+      }
+
+      // Animate the cornel box
+      function animateCornelBox() {}
+
+      // Traverse all children nodes of a parent node
+      function traverse(node, f) {
+        f(node);
+        node.children.forEach((nextNode) => {
+          traverse(nextNode, f);
+        });
+      }
+
+      // Enable shadows for object
+      function enableShadows(obj) {
+        // Warning: very computationally costly
+        if (obj.isMesh === true) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+        }
+      }
+
+      // Enable transparency for object meshes
+      function enableTransparency(obj) {
+        if (obj.isMesh === true) {
+          obj.material.transparent = true;
+          obj.material.opacity = 0.5;
+        }
+      }
+
+      // Setup VR
+      function setupVR() {
+        // Enable XR
+        renderer.xr.enabled = true;
+
+        // Add XR button
+        document.body.appendChild(VRButton.createButton(renderer));
+
+        // Controller setup
+        const controllerModelFactory = new XRControllerModelFactory();
+        const controllerGrip1 = renderer.xr.getControllerGrip(0);
+        controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+        scene.add(controllerGrip1);
+        const controllerGrip2 = renderer.xr.getControllerGrip(1);
+        controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+        scene.add(controllerGrip2);
+      }
+
+      /* FROM PREVIOUS EXERCISES */
+      // Fix window resize
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // Create a cross using a Line. `opacity` defines its opacity
+      function createCross(opacity) {
+        const material = new THREE.LineBasicMaterial({
+          color: 0xffffff,
+          opacity: opacity,
+          transparent: true,
+        });
+        const points = [];
+        points.push(new THREE.Vector3(1, 0, 0));
+        points.push(new THREE.Vector3(-1, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 0));
+        points.push(new THREE.Vector3(0, 0, 1));
+        points.push(new THREE.Vector3(0, 0, -1));
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const cross = new THREE.Line(geometry, material);
+        return cross;
+      }
+
+      // Create a floor of crosses
+      function floorOfCrosses(FADE_START = 100, FADE_END = 200) {
+        /*
+        `FADE_START`:Minimum distance from center with opacity=1
+        `FADE_END`: Distance from center at which opacity=0
+        */
+        const floor = new THREE.Object3D();
+        scene.add(floor);
+        // Loop through x and z axis from -50 to +50, so that the floor center is at (0,0,0)
+        for (let x = -50; x < 50; x++) {
+          // x axis
+          for (let z = -50; z < 50; z++) {
+            // z axis
+            const x_pos = x * 10; // Scale up by 10
+            const z_pos = z * 10; // Scale up by 10
+            // Calculate distance from center to determine cross opacity. This create a fading effect in a round area around the center
+            const radius = Math.sqrt(Math.pow(x_pos, 2) + Math.pow(z_pos, 2));
+            const FADE_RANGE = FADE_END - FADE_START; // Range of progressive fade
+            let crossOpacity;
+            if (radius < FADE_START) {
+              // Show cross with full opacity when its under the minimum distance
+              crossOpacity = 1;
+            } else {
+              // Progressive opacity reduction the further from the center it is
+              const distance = radius - FADE_START; // Distance from start of fade
+              crossOpacity = 1 - distance / FADE_RANGE;
+            }
+            // Create and position the cross
+            const cross = createCross(crossOpacity);
+            cross.position.x = x_pos;
+            cross.position.z = z_pos;
+            // Add the cross to the floor as a child
+            floor.add(cross);
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

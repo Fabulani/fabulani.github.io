@@ -80,8 +80,8 @@
       scene.add(sphere);
       scene.add(cylinder);
 
-      // Create the GUI
-      const gui = createGUI();
+      // Setup the GUI
+      setupGUI(scene);
 
       //! DEBUG ONLY: make everything transparent
       // traverse(cornelBox, enableTransparency);
@@ -261,9 +261,10 @@
       }
 
       // Create a screen lowerer
-      function createScreenLowerer() {
+      function createScreenLowerer(name) {
         // Create the screen lowerer group
         const screenLowerer = new THREE.Object3D();
+        screenLowerer.name = name;
 
         // Cornel box measurements
         const fringeLength = 0.0625;
@@ -292,6 +293,9 @@
         const screenBottomGeometry = new THREE.BoxGeometry(28 - 2 * cornerWidth, 2 * cornerWidth, fringeLength);
         const screenPanel = new THREE.Mesh(screenPanelGeometry, screenMaterial);
         const screenBottom = new THREE.Mesh(screenBottomGeometry, material);
+        screen.name = name + "_screen";
+        screenPanel.name = name + "_screenPanel";
+        screenBottom.name = name + "_screenBottom";
 
         // Position the screen parts
         screenBottom.position.y = cornerWidth;
@@ -318,9 +322,10 @@
       }
 
       // Create one face of the cornel box
-      function createCornelFace() {
+      function createCornelFace(name = "cornelFace") {
         // Create the face group
         const face = new THREE.Object3D();
+        face.name = name;
 
         // Create the frames
         const lFramePiece = createFramePiece(29.5);
@@ -332,7 +337,7 @@
         const panel = createPanel();
 
         // Create the screen lowerer
-        const screenLowerer = createScreenLowerer();
+        const screenLowerer = createScreenLowerer(name + "screenLowerer");
 
         // Position the frames
         lFramePiece.position.set(-14.5, 0.5, 0);
@@ -509,9 +514,17 @@
       }
 
       // Create the GUI
-      function createGUI() {
-        const gui = new GUI();
-        return gui;
+      function setupGUI(scene) {
+        const gui = new GUI({ title: "Cornel Settings" });
+
+        const settings = {
+          color1: "#AA00FF",
+          color2: "#a0f",
+          color3: "rgb(170, 0, 255)",
+          color4: 0xaa00ff,
+        };
+
+        gui.addColor(settings, "color1");
       }
 
       // Traverse all children nodes of a parent node

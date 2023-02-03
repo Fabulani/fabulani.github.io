@@ -66,6 +66,10 @@
       const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshPhysicalMaterial());
       const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 32), new THREE.MeshPhongMaterial());
 
+      // Name entities
+      table.name = "table";
+      cone.name = "cone";
+
       // Position the scene entities
       cone.position.set(-3, 6, -1);
       sphere.position.set(0, 6.25, 1);
@@ -87,7 +91,9 @@
       // traverse(cornelBox, enableTransparency);
 
       // Enable shadows
-      // traverse(scene.getObjectByName("cornelBox"), enableShadows);
+      traverse(scene.getObjectByName("cornelBox"), enableShadows);
+      traverse(scene.getObjectByName("table"), enableShadows);
+      traverse(scene.getObjectByName("cone"), enableShadows);
 
       // Render with setAnimationLoop for XR compatibility
       renderer.setAnimationLoop(function (time) {
@@ -131,35 +137,9 @@
         // Lights
         {
           const color = 0xffffff;
-          const intensity = 1;
-          const light = new THREE.DirectionalLight(color, intensity);
-          light.position.set(0, 50, 25);
-          const helper = new THREE.DirectionalLightHelper(light, 5);
-          scene.add(helper);
-          scene.add(light);
-        }
-        {
-          const color = 0xffffff;
-          const intensity = 1;
-          const light = new THREE.DirectionalLight(color, intensity);
-          light.position.set(25, 50, -25);
-          const helper = new THREE.DirectionalLightHelper(light, 5);
-          scene.add(helper);
-          scene.add(light);
-        }
-        {
-          const color = 0xffffff;
-          const intensity = 1;
-          const light = new THREE.DirectionalLight(color, intensity);
-          light.position.set(-25, 50, -25);
-          const helper = new THREE.DirectionalLightHelper(light, 5);
-          scene.add(helper);
-          scene.add(light);
-        }
-        {
-          const color = 0xffffff;
           const intensity = 0.2;
           const light = new THREE.AmbientLight(color, intensity);
+          light.name = "ambientLight";
           scene.add(light);
         }
 
@@ -231,7 +211,7 @@
       }
 
       // Create a panel (yellow front face, white back face)
-      function createPanel() {
+      function createPanel(name = "panel") {
         // Create the panel group
         const panel = new THREE.Object3D();
 
@@ -248,6 +228,7 @@
         ];
         const panelFront = new THREE.Mesh(panelGeometry, panelMaterials[0]);
         const panelBack = new THREE.Mesh(panelGeometry, panelMaterials[1]);
+        panelBack.name = name + "_back";
 
         // Distance the front and back faces
         panelFront.position.z = fringeLength / 2;
@@ -334,10 +315,10 @@
         const bFramePiece = createFramePiece(28);
 
         // Create the panel
-        const panel = createPanel();
+        const panel = createPanel(name + "_panel");
 
         // Create the screen lowerer
-        const screenLowerer = createScreenLowerer(name + "screenLowerer");
+        const screenLowerer = createScreenLowerer(name + "_screenLowerer");
 
         // Position the frames
         lFramePiece.position.set(-14.5, 0.5, 0);
@@ -365,7 +346,7 @@
 
       // Create the roof lamp
       // TODO: make the lamp model
-      function createLamp() {
+      function createLamp(name = "lamp") {
         // Create the lamp group
         const lamp = new THREE.Object3D();
 
@@ -373,9 +354,30 @@
         const lampMaterial = new THREE.MeshLambertMaterial({ color: "#ffffff" });
         const lampGeometry = new THREE.BoxGeometry(1, 1, 1);
         const lampCube = new THREE.Mesh(lampGeometry, lampMaterial);
+        lampCube.name = "lampCube";
 
         // Position the lamp elements
         lampCube.position.y = -1; // Anchor point at the top
+
+        // Directional Light
+        const directionalColor = 0xffffff;
+        const directionalIntensity = 0;
+        const directionalLight = new THREE.DirectionalLight(directionalColor, directionalIntensity);
+        directionalLight.name = name + "_directionalLight";
+        lamp.add(directionalLight);
+
+        // Point light
+        const pointColor = 0xff0000;
+        const pointIntensity = 0.5;
+        const pointDistance = 100;
+        const pointDecay = 2;
+        const pointLight = new THREE.PointLight(pointColor, pointIntensity, pointDistance, pointDecay);
+        pointLight.name = name + "_pointLight";
+        lamp.add(pointLight);
+
+        // DEBUG: helper
+        const helper = new THREE.DirectionalLightHelper(directionalLight, 5);
+        directionalLight.add(helper);
 
         // Add to the lamp group
         lamp.add(lampCube);
@@ -384,7 +386,7 @@
       }
 
       // Create the roof for the cornel box
-      function createCornelRoof() {
+      function createCornelRoof(name = "roof") {
         // Create the roof group
         const roof = new THREE.Object3D();
 
@@ -392,6 +394,7 @@
         const panelGeometry = new THREE.BoxGeometry(28, 0.5, 28);
         const panelMaterial = new THREE.MeshLambertMaterial({ color: "#ffffff" });
         const upperPanel = new THREE.Mesh(panelGeometry, panelMaterial);
+        upperPanel.name = name + "_upperPanel";
 
         // Create the roof frames (h=horizontal, v=vertical, c=center)
         const hLength = 28;
@@ -404,26 +407,26 @@
         const cFrame2 = createFramePiece(vLength);
 
         // Create the lamp
-        const lamp = createLamp();
+        const lamp = createLamp(name + "_lamp");
 
         // Position the upper panel
         upperPanel.position.y = 0.25;
 
-        // Position the roof frames
+        // Position the roof frames (y=-0.01 to avoid flickering with panel)
         // TODO: check the calculations. Lengths are too big
         const offset = 0.25; // Offset = half the width of the frame (1)
         hFrame1.rotation.z = Math.PI / 2;
-        hFrame1.position.set(hLength / 2, 0, vLength / 2 - offset);
+        hFrame1.position.set(hLength / 2, -0.01, vLength / 2 - offset);
         hFrame2.rotation.z = Math.PI / 2;
-        hFrame2.position.set(hLength / 2, 0, -vLength / 2 + offset);
+        hFrame2.position.set(hLength / 2, -0.01, -vLength / 2 + offset);
         vFrame1.rotation.x = Math.PI / 2;
-        vFrame1.position.set(-hLength / 4, 0, -vLength / 2);
+        vFrame1.position.set(-hLength / 4, -0.01, -vLength / 2);
         vFrame2.rotation.x = Math.PI / 2;
-        vFrame2.position.set(hLength / 4, 0, -vLength / 2);
+        vFrame2.position.set(hLength / 4, -0.01, -vLength / 2);
         cFrame1.rotation.x = Math.PI / 2;
-        cFrame1.position.z = vLength / 2 + offset;
+        cFrame1.position.set(0, -0.01, vLength / 2 + offset);
         cFrame2.rotation.x = -Math.PI / 2;
-        cFrame2.position.z = -vLength / 2 - offset;
+        cFrame2.position.set(0, -0.01, -vLength / 2 - offset);
 
         // Add to the roof group
         roof.add(upperPanel);
@@ -444,13 +447,13 @@
         cornelBox.name = name;
 
         // Create the cornel box faces
-        const frontFace = createCornelFace();
-        const leftFace = frontFace.clone();
-        const rightFace = frontFace.clone();
-        const backFace = frontFace.clone();
+        const frontFace = createCornelFace(name + "_frontCornelFace");
+        const leftFace = createCornelFace(name + "_leftCornelFace");
+        const rightFace = createCornelFace(name + "_rightCornelFace");
+        const backFace = createCornelFace(name + "_backCornelFace");
 
         // Create the cornel box roof
-        const roof = createCornelRoof();
+        const roof = createCornelRoof(name + "_roof");
 
         // Position the cornel box elements
         frontFace.position.z = 14.5;
@@ -481,6 +484,7 @@
       function createTable() {
         // Create the table group
         const table = new THREE.Object3D();
+        table.name = "name";
 
         // Create the material
         const material = new THREE.MeshLambertMaterial({ color: "#808080" });
@@ -513,18 +517,67 @@
         return table;
       }
 
-      // Create the GUI
+      // Setup the GUI
       function setupGUI(scene) {
+        // Top level controller
         const gui = new GUI({ title: "Cornel Settings" });
 
+        // Get references
+        const frontPanel = scene.getObjectByName("cornelBox_frontCornelFace_screenLowerer_screenPanel");
+        const leftPanel = scene.getObjectByName("cornelBox_leftCornelFace_screenLowerer_screenPanel");
+        const rightPanel = scene.getObjectByName("cornelBox_rightCornelFace_screenLowerer_screenPanel");
+        const backPanel = scene.getObjectByName("cornelBox_backCornelFace_screenLowerer_screenPanel");
+        const frontTopPanel = scene.getObjectByName("cornelBox_frontCornelFace_panel_back");
+        const leftTopPanel = scene.getObjectByName("cornelBox_leftCornelFace_panel_back");
+        const rightTopPanel = scene.getObjectByName("cornelBox_rightCornelFace_panel_back");
+        const backTopPanel = scene.getObjectByName("cornelBox_backCornelFace_panel_back");
+        const roofPanel = scene.getObjectByName("cornelBox_roof_upperPanel");
+
+        // Settings for the gui
         const settings = {
-          color1: "#AA00FF",
-          color2: "#a0f",
-          color3: "rgb(170, 0, 255)",
-          color4: 0xaa00ff,
+          frontPanelColor: frontPanel.material.color,
+          leftPanelColor: leftPanel.material.color,
+          rightPanelColor: rightPanel.material.color,
+          backPanelColor: backPanel.material.color,
+          roofPanel: roofPanel.material.color,
         };
 
-        gui.addColor(settings, "color1");
+        // Panel color settings
+        const folderPanelColors = gui.addFolder("Panel colors");
+        folderPanelColors
+          .addColor(settings, "frontPanelColor")
+          .name("Front")
+          .onChange((color) => {
+            frontPanel.material.color.set(color);
+            frontTopPanel.material.color.set(color);
+          });
+        folderPanelColors
+          .addColor(settings, "leftPanelColor")
+          .name("Left")
+          .onChange((color) => {
+            leftPanel.material.color.set(color);
+            leftTopPanel.material.color.set(color);
+          });
+        folderPanelColors
+          .addColor(settings, "rightPanelColor")
+          .name("Right")
+          .onChange((color) => {
+            rightPanel.material.color.set(color);
+            rightTopPanel.material.color.set(color);
+          });
+        folderPanelColors
+          .addColor(settings, "backPanelColor")
+          .name("Back")
+          .onChange((color) => {
+            backPanel.material.color.set(color);
+            backTopPanel.material.color.set(color);
+          });
+        folderPanelColors
+          .addColor(settings, "roofPanel")
+          .name("Roof")
+          .onChange((color) => {
+            roofPanel.material.color.set(color);
+          });
       }
 
       // Traverse all children nodes of a parent node

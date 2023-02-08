@@ -69,6 +69,8 @@
       // Name entities
       table.name = "table";
       cone.name = "cone";
+      sphere.name = "sphere";
+      cylinder.name = "cylinder";
 
       // Position the scene entities
       cone.position.set(-3, 6, -1);
@@ -85,7 +87,7 @@
       scene.add(cylinder);
 
       // Setup the GUI
-      setupGUI(scene);
+      setupGUI();
 
       //! DEBUG ONLY: make everything transparent
       // traverse(cornelBox, enableTransparency);
@@ -94,6 +96,9 @@
       traverse(scene.getObjectByName("cornelBox"), enableShadows);
       traverse(scene.getObjectByName("table"), enableShadows);
       traverse(scene.getObjectByName("cone"), enableShadows);
+      const c = scene.getObjectByName("lampCube"); // TODO: fix this
+      c.enableShadows = false;
+      c.castShadow = false;
 
       // Render with setAnimationLoop for XR compatibility
       renderer.setAnimationLoop(function (time) {
@@ -361,26 +366,33 @@
 
         // Directional Light
         const directionalColor = 0xffffff;
-        const directionalIntensity = 0;
+        const directionalIntensity = 0.25;
         const directionalLight = new THREE.DirectionalLight(directionalColor, directionalIntensity);
         directionalLight.name = name + "_directionalLight";
-        lamp.add(directionalLight);
+        directionalLight.target = scene;
 
         // Point light
         const pointColor = 0xff0000;
-        const pointIntensity = 0.5;
+        const pointIntensity = 0.25;
         const pointDistance = 100;
         const pointDecay = 2;
         const pointLight = new THREE.PointLight(pointColor, pointIntensity, pointDistance, pointDecay);
         pointLight.name = name + "_pointLight";
-        lamp.add(pointLight);
 
-        // DEBUG: helper
-        const helper = new THREE.DirectionalLightHelper(directionalLight, 5);
-        directionalLight.add(helper);
+        // Spotlight
+        const spotLight = new THREE.SpotLight(0xffffff, 0.25);
+        spotLight.name = name + "_spotLight";
+
+        // Hemisphere light
+        const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.25);
+        hemisphereLight.name = name + "_hemisphereLight";
 
         // Add to the lamp group
         lamp.add(lampCube);
+        lamp.add(directionalLight);
+        lamp.add(pointLight);
+        lamp.add(spotLight);
+        lamp.add(hemisphereLight);
 
         return lamp;
       }
@@ -408,6 +420,10 @@
 
         // Create the lamp
         const lamp = createLamp(name + "_lamp");
+
+        // DEBUG
+        const axesHelper = new THREE.AxesHelper(5);
+        lamp.add(axesHelper);
 
         // Position the upper panel
         upperPanel.position.y = 0.25;
@@ -518,7 +534,7 @@
       }
 
       // Setup the GUI
-      function setupGUI(scene) {
+      function setupGUI() {
         // Top level controller
         const gui = new GUI({ title: "Cornel Settings" });
 
@@ -532,14 +548,47 @@
         const rightTopPanel = scene.getObjectByName("cornelBox_rightCornelFace_panel_back");
         const backTopPanel = scene.getObjectByName("cornelBox_backCornelFace_panel_back");
         const roofPanel = scene.getObjectByName("cornelBox_roof_upperPanel");
+        const directionalLight = scene.getObjectByName("cornelBox_roof_lamp_directionalLight");
+        const pointLight = scene.getObjectByName("cornelBox_roof_lamp_pointLight");
+        const spotLight = scene.getObjectByName("cornelBox_roof_lamp_spotLight");
+        const hemisphereLight = scene.getObjectByName("cornelBox_roof_lamp_hemisphereLight");
 
         // Settings for the gui
         const settings = {
+          // Panel material
           frontPanelColor: frontPanel.material.color,
           leftPanelColor: leftPanel.material.color,
           rightPanelColor: rightPanel.material.color,
           backPanelColor: backPanel.material.color,
           roofPanel: roofPanel.material.color,
+
+          // Checkboxes for enabling different types of lights
+          directionalLightEnable: directionalLight.visible,
+          pointLightEnable: pointLight.visible,
+          spotLightEnable: spotLight.visible,
+          hemisphereLightEnable: hemisphereLight.visible,
+
+          // Light intensities
+          directionalLightIntensity: directionalLight.intensity,
+          pointLightIntensity: pointLight.intensity,
+          spotLightIntensity: spotLight.intensity,
+          hemisphereLightIntensity: hemisphereLight.intensity,
+
+          // Light colors
+          directionalLightColor: directionalLight.color,
+          pointLightColor: pointLight.color,
+          spotLightColor: spotLight.color,
+          hemisphereLightColor: hemisphereLight.color,
+
+          // Directional light specific settings
+          directionalLightCastShadow: directionalLight.castShadow,
+          directionalLightTarget: directionalLight.target,
+
+          // Point light specific settings
+          pointLightCastShadow: pointLight.castShadow,
+          pointLightDecay: pointLight.decay,
+          pointLightDistance: pointLight.distance,
+          pointLightPower: pointLight.power,
         };
 
         // Panel color settings
@@ -578,6 +627,130 @@
           .onChange((color) => {
             roofPanel.material.color.set(color);
           });
+
+        // Lights folders
+        const folderDirectionalLight = gui.addFolder("Directional Light");
+        const folderPointLight = gui.addFolder("Point Light");
+        const folderSpotLight = gui.addFolder("Spot Light");
+        const folderHemisphereLight = gui.addFolder("Hemisphere Light");
+
+        // Helper object to add common light settings
+        // TODO: add ambient light
+        const lights = [
+          {
+            folder: folderDirectionalLight,
+            ref: directionalLight,
+            prefix: "directionalLight",
+          },
+          {
+            folder: folderPointLight,
+            ref: pointLight,
+            prefix: "pointLight",
+          },
+          {
+            folder: folderSpotLight,
+            ref: spotLight,
+            prefix: "spotLight",
+          },
+          {
+            folder: folderHemisphereLight,
+            ref: hemisphereLight,
+            prefix: "hemisphereLight",
+          },
+        ];
+
+        function addCommonLightSettings(light) {
+          // Add light settings to the gui
+          const folder = light["folder"];
+          const ref = light["ref"];
+          const prefix = light["prefix"];
+          folder
+            .add(settings, prefix + "Enable")
+            .name("Enable")
+            .onChange((toggle) => {
+              ref.visible = toggle;
+            });
+          folder
+            .add(settings, prefix + "Intensity")
+            .min(0)
+            .max(1)
+            .name("Intensity")
+            .onChange((intensity) => {
+              ref.intensity = intensity;
+            });
+          folder
+            .addColor(settings, prefix + "Color")
+            .name("Color")
+            .onChange((color) => {
+              ref.color = color;
+            });
+        }
+
+        // Add common settings for each light
+        lights.forEach((light) => {
+          addCommonLightSettings(light);
+        });
+
+        // Add other directional light settings
+        folderDirectionalLight
+          .add(settings, "directionalLightCastShadow")
+          .name("Cast shadows")
+          .onChange((toggle) => {
+            directionalLight.castShadow = toggle;
+          });
+        folderDirectionalLight
+          .add(settings, "directionalLightTarget", {
+            Scene: scene,
+            Table: table,
+            Cone: cone,
+            Sphere: sphere,
+            Cylinder: cylinder,
+          })
+          .name("Target")
+          .onChange((tgt) => {
+            directionalLight.target = tgt;
+          });
+
+        // Add other point light settings
+        folderPointLight
+          .add(settings, "pointLightCastShadow")
+          .name("Cast shadows")
+          .onChange((toggle) => {
+            pointLight.castShadow = toggle;
+          });
+        // TODO: In context of physically-correct rendering the default value (2) should not be changed.
+        folderPointLight
+          .add(settings, "pointLightDecay")
+          .min(0)
+          .max(100)
+          .name("Decay")
+          .onChange((value) => {
+            pointLight.decay = value;
+          });
+        folderPointLight
+          .add(settings, "pointLightDistance")
+          .min(0)
+          .max(100)
+          .name("Distance")
+          .onChange((value) => {
+            pointLight.distance = value;
+          });
+        folderPointLight
+          .add(settings, "pointLightPower")
+          .min(0)
+          .max(100)
+          .name("Power")
+          .onChange((value) => {
+            pointLight.power = value;
+          });
+
+        // TODO: NEXT STEPS HERE!
+
+        // Add other spot light settings
+
+        // Add other hemisphere light settings
+
+        // TODO: add other ambient light settings
       }
 
       // Traverse all children nodes of a parent node

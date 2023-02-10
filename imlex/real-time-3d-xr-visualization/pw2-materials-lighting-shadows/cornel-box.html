@@ -86,6 +86,9 @@
       scene.add(sphere);
       scene.add(cylinder);
 
+      // Hide front screen lowerer of the Cornel Box
+      scene.getObjectByName("cornelBox_frontCornelFace_screenLowerer").visible = false;
+
       // Setup the GUI
       setupGUI();
 
@@ -157,9 +160,12 @@
         // Add a simple floor
         const floor = new THREE.Mesh(
           new THREE.BoxGeometry(100, 0.01, 100),
-          new THREE.MeshBasicMaterial({ color: "#123456" })
+          new THREE.MeshBasicMaterial({ color: "gray" })
         );
         scene.add(floor);
+        // TODO: fix this, shadows not working for the floor
+        floor.enableShadows = true;
+        floor.castShadow = true;
       }
 
       // Create a frame piece (metallic lengthy component with fringes)
@@ -382,6 +388,7 @@
         // Spotlight
         const spotLight = new THREE.SpotLight(0xffffff, 0.25);
         spotLight.name = name + "_spotLight";
+        spotLight.target = scene;
 
         // Hemisphere light
         const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.25);
@@ -543,6 +550,10 @@
         const leftPanel = scene.getObjectByName("cornelBox_leftCornelFace_screenLowerer_screenPanel");
         const rightPanel = scene.getObjectByName("cornelBox_rightCornelFace_screenLowerer_screenPanel");
         const backPanel = scene.getObjectByName("cornelBox_backCornelFace_screenLowerer_screenPanel");
+        const frontScreenLowerer = scene.getObjectByName("cornelBox_frontCornelFace_screenLowerer");
+        const leftScreenLowerer = scene.getObjectByName("cornelBox_leftCornelFace_screenLowerer");
+        const rightScreenLowerer = scene.getObjectByName("cornelBox_rightCornelFace_screenLowerer");
+        const backScreenLowerer = scene.getObjectByName("cornelBox_backCornelFace_screenLowerer");
         const frontTopPanel = scene.getObjectByName("cornelBox_frontCornelFace_panel_back");
         const leftTopPanel = scene.getObjectByName("cornelBox_leftCornelFace_panel_back");
         const rightTopPanel = scene.getObjectByName("cornelBox_rightCornelFace_panel_back");
@@ -555,6 +566,12 @@
 
         // Settings for the gui
         const settings = {
+          // Enable/disable screen lowerers
+          enableFrontScreenLowerer: frontScreenLowerer.visible,
+          enableLeftScreenLowerer: leftScreenLowerer.visible,
+          enableRightScreenLowerer: rightScreenLowerer.visible,
+          enableBackScreenLowerer: backScreenLowerer.visible,
+
           // Panel material
           frontPanelColor: frontPanel.material.color,
           leftPanelColor: leftPanel.material.color,
@@ -589,39 +606,83 @@
           pointLightDecay: pointLight.decay,
           pointLightDistance: pointLight.distance,
           pointLightPower: pointLight.power,
+
+          // Spot light specific settings
+          spotLightAngle: spotLight.angle * (180 / Math.PI),
+          spotLightCastShadow: spotLight.castShadow,
+          spotLightDecay: spotLight.decay,
+          spotLightDistance: spotLight.distance,
+          spotLightPenumbra: spotLight.penumbra,
+          spotLightPower: spotLight.power,
+          spotLightTarget: spotLight.target,
+          spotLightMap: spotLight.map,
+
+          // Hemisphere light specific settings
+          hemisphereLightGroundColor: hemisphereLight.groundColor,
         };
 
-        // Panel color settings
-        const folderPanelColors = gui.addFolder("Panel colors");
-        folderPanelColors
+        // Top-level folder for structure related folders
+        const folderStructure = gui.addFolder("Structure");
+        folderStructure.close();
+
+        // Screen lowerer settings
+        const folderScreenLowerer = folderStructure.addFolder("Screen Lowerers");
+        folderScreenLowerer
+          .add(settings, "enableFrontScreenLowerer")
+          .name("Enable front")
+          .onChange((toggle) => {
+            frontScreenLowerer.visible = toggle;
+          });
+        folderScreenLowerer
+          .add(settings, "enableLeftScreenLowerer")
+          .name("Enable left")
+          .onChange((toggle) => {
+            leftScreenLowerer.visible = toggle;
+          });
+        folderScreenLowerer
+          .add(settings, "enableRightScreenLowerer")
+          .name("Enable right")
+          .onChange((toggle) => {
+            rightScreenLowerer.visible = toggle;
+          });
+        folderScreenLowerer
+          .add(settings, "enableBackScreenLowerer")
+          .name("Enable back")
+          .onChange((toggle) => {
+            backScreenLowerer.visible = toggle;
+          });
+
+        // Panel settings
+        const folderPanels = folderStructure.addFolder("Panels");
+        folderPanels
           .addColor(settings, "frontPanelColor")
           .name("Front")
           .onChange((color) => {
             frontPanel.material.color.set(color);
             frontTopPanel.material.color.set(color);
           });
-        folderPanelColors
+        folderPanels
           .addColor(settings, "leftPanelColor")
           .name("Left")
           .onChange((color) => {
             leftPanel.material.color.set(color);
             leftTopPanel.material.color.set(color);
           });
-        folderPanelColors
+        folderPanels
           .addColor(settings, "rightPanelColor")
           .name("Right")
           .onChange((color) => {
             rightPanel.material.color.set(color);
             rightTopPanel.material.color.set(color);
           });
-        folderPanelColors
+        folderPanels
           .addColor(settings, "backPanelColor")
           .name("Back")
           .onChange((color) => {
             backPanel.material.color.set(color);
             backTopPanel.material.color.set(color);
           });
-        folderPanelColors
+        folderPanels
           .addColor(settings, "roofPanel")
           .name("Roof")
           .onChange((color) => {
@@ -629,10 +690,12 @@
           });
 
         // Lights folders
-        const folderDirectionalLight = gui.addFolder("Directional Light");
-        const folderPointLight = gui.addFolder("Point Light");
-        const folderSpotLight = gui.addFolder("Spot Light");
-        const folderHemisphereLight = gui.addFolder("Hemisphere Light");
+        const folderLights = gui.addFolder("Lights");
+        folderLights.close();
+        const folderDirectionalLight = folderLights.addFolder("Directional Light");
+        const folderPointLight = folderLights.addFolder("Point Light");
+        const folderSpotLight = folderLights.addFolder("Spot Light");
+        const folderHemisphereLight = folderLights.addFolder("Hemisphere Light");
 
         // Helper object to add common light settings
         // TODO: add ambient light
@@ -747,10 +810,76 @@
         // TODO: NEXT STEPS HERE!
 
         // Add other spot light settings
+        folderSpotLight
+          .add(settings, "spotLightAngle")
+          .min(0)
+          .max(180)
+          .name("Angle (degrees)")
+          .onChange((value) => {
+            spotLight.angle = value * (Math.PI / 180);
+          });
+        folderSpotLight
+          .add(settings, "spotLightCastShadow")
+          .name("Cast shadow")
+          .onChange((toggle) => {
+            spotLight.castShadow = toggle;
+          });
+        folderSpotLight
+          .add(settings, "spotLightDecay")
+          .min(0)
+          .max(100)
+          .name("Decay")
+          .onChange((value) => {
+            spotLight.decay = value;
+          });
+        folderSpotLight
+          .add(settings, "spotLightDistance")
+          .min(0)
+          .max(100)
+          .name("Distance")
+          .onChange((value) => {
+            spotLight.distance = value;
+          });
+        folderSpotLight
+          .add(settings, "spotLightPenumbra")
+          .min(0)
+          .max(1)
+          .name("Penumbra")
+          .onChange((value) => {
+            spotLight.penumbra = value;
+          });
+        folderSpotLight
+          .add(settings, "spotLightPower")
+          .min(0)
+          .max(100)
+          .name("Power")
+          .onChange((value) => {
+            spotLight.power = value;
+          });
+        folderSpotLight
+          .add(settings, "spotLightTarget", {
+            Scene: scene,
+            Table: table,
+            Cone: cone,
+            Sphere: sphere,
+            Cylinder: cylinder,
+          })
+          .name("Target")
+          .onChange((tgt) => {
+            spotLight.target = tgt;
+          });
 
         // Add other hemisphere light settings
+        folderHemisphereLight
+          .addColor(settings, "hemisphereLightGroundColor")
+          .name("Ground color")
+          .onChange((color) => {
+            hemisphereLight.groundColor = color;
+          });
 
         // TODO: add other ambient light settings
+
+        // TODO: for VR, place the gui as an object with listeners for sessionStart and sessionEnd so it only shows up in VR
       }
 
       // Traverse all children nodes of a parent node

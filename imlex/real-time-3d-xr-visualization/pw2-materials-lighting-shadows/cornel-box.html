@@ -46,6 +46,10 @@
       import { VRButton } from "three/addons/webxr/VRButton.js";
       import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
       import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+      import { RectAreaLightHelper } from "three/addons/helpers/RectAreaLightHelper.js";
+      import { RectAreaLightUniformsLib } from "three/addons/lights/RectAreaLightUniformsLib.js";
+      import { InteractiveGroup } from "three/addons/interactive/InteractiveGroup.js";
+      import { HTMLMesh } from "three/addons/interactive/HTMLMesh.js";
 
       /* Main script */
       let camera, globalScene, scene, renderer, controls;
@@ -53,57 +57,75 @@
       // Initialize empty scene with cameras and controls
       init();
 
-      // Enable VR
-      // setupVR();
+      // Initialize rect area light
+      RectAreaLightUniformsLib.init();
 
-      // Create the floor of crosses
-      floorOfCrosses(25, 50);
+      // Enable VR
+      setupVR();
 
       // Create scene entities
+      const cornelScene = new THREE.Object3D();
       const cornelBox = createCornelBox();
       const table = createTable();
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(1, 2, 32), new THREE.MeshLambertMaterial());
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshPhysicalMaterial());
-      const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 32), new THREE.MeshPhongMaterial());
+      const coneLambert = new THREE.Mesh(new THREE.ConeGeometry(1, 2, 32), new THREE.MeshLambertMaterial());
+      const spherePhysical = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 32), new THREE.MeshPhysicalMaterial());
+      const cylinderPhong = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 32), new THREE.MeshPhongMaterial());
 
       // Name entities
       table.name = "table";
-      cone.name = "coneLambert";
-      sphere.name = "spherePhysical";
-      cylinder.name = "cylinderPhong";
+      coneLambert.name = "coneLambert";
+      spherePhysical.name = "spherePhysical";
+      cylinderPhong.name = "cylinderPhong";
 
       // Position the scene entities
-      cone.position.set(-3, 6, -1);
-      sphere.position.set(0, 6.25, 1);
-      cylinder.position.set(3, 6, -1);
-
-      // TODO: CHECK MESHSTANDARDMATERIAL IN 3.JS DOCS
+      coneLambert.position.set(-3, 6, -1);
+      spherePhysical.position.set(0, 6.25, 1);
+      cylinderPhong.position.set(3, 6, -1);
+      cornelScene.position.set(0, 0, -5);
+      cornelScene.scale.set(0.25, 0.25, 0.25);
 
       // Add to the scene
-      scene.add(cornelBox);
-      scene.add(table);
-      scene.add(cone);
-      scene.add(sphere);
-      scene.add(cylinder);
+      cornelScene.add(cornelBox);
+      cornelScene.add(table);
+      cornelScene.add(coneLambert);
+      cornelScene.add(spherePhysical);
+      cornelScene.add(cylinderPhong);
+      scene.add(cornelScene);
 
       // Hide front screen lowerer of the Cornel Box
       scene.getObjectByName("cornelBox_frontCornelFace_screenLowerer").visible = false;
 
+      // Setup panel colors according to a Cornel Box
+      const red = new THREE.Color("rgb(255, 0, 0)");
+      const green = new THREE.Color("rgb(0, 255, 0)");
+      scene.getObjectByName("cornelBox_leftCornelFace_screenLowerer_screenPanel").material.color = red;
+      scene.getObjectByName("cornelBox_leftCornelFace_panel_back").material.color = red;
+      scene.getObjectByName("cornelBox_leftCornelFace_screenLowerer_screenPanelLight").color = red;
+      scene.getObjectByName("cornelBox_leftCornelFace_panel_light").color = red;
+
+      scene.getObjectByName("cornelBox_rightCornelFace_screenLowerer_screenPanel").material.color = green;
+      scene.getObjectByName("cornelBox_rightCornelFace_panel_back").material.color = green;
+      scene.getObjectByName("cornelBox_rightCornelFace_screenLowerer_screenPanelLight").color = green;
+      scene.getObjectByName("cornelBox_rightCornelFace_panel_light").color = green;
+
+      // Add a floor
+      const floor = new THREE.Mesh(
+        new THREE.BoxGeometry(100, 0.01, 100),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      scene.add(floor);
+      floor.receiveShadow = true;
+      floor.castShadow = true;
+
       // Setup the GUI
       setupGUI();
 
-      //! DEBUG ONLY: make everything transparent
-      // traverse(cornelBox, enableTransparency);
-
       // Enable shadows
-      traverse(scene.getObjectByName("cornelBox"), enableShadows);
-      traverse(scene.getObjectByName("table"), enableShadows);
-      traverse(scene.getObjectByName("coneLambert"), enableShadows);
-      traverse(scene.getObjectByName("spherePhysical"), enableShadows);
-      traverse(scene.getObjectByName("cylinderPhong"), enableShadows);
-      const c = scene.getObjectByName("lampCube"); // TODO: fix this
-      c.enableShadows = false;
-      c.castShadow = false;
+      traverse(cornelBox, enableShadows);
+      traverse(table, enableShadows);
+      traverse(coneLambert, enableShadows);
+      traverse(spherePhysical, enableShadows);
+      traverse(cylinderPhong, enableShadows);
 
       // Render with setAnimationLoop for XR compatibility
       renderer.setAnimationLoop(function (time) {
@@ -130,7 +152,7 @@
 
         // Cameras
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 500);
-        camera.position.set(0, 10.5, 14);
+        camera.position.set(0, 2, 1);
 
         // Controls
         controls = new OrbitControls(camera, renderer.domElement);
@@ -140,7 +162,8 @@
         controls.screenSpacePanning = false;
         controls.minDistance = 0;
         controls.maxDistance = 500;
-        controls.target = new THREE.Vector3(0, 10, 0);
+        controls.target = new THREE.Vector3(0, 1, -5);
+
         // controls.autoRotate = true;
         controls.autoRotateSpeed = 1;
 
@@ -158,16 +181,6 @@
 
         // Window resize fix
         window.addEventListener("resize", onWindowResize);
-
-        // Add a simple floor
-        const floor = new THREE.Mesh(
-          new THREE.BoxGeometry(100, 0.01, 100),
-          new THREE.MeshBasicMaterial({ color: "gray" })
-        );
-        scene.add(floor);
-        // TODO: fix this, shadows not working for the floor
-        floor.enableShadows = true;
-        floor.castShadow = true;
       }
 
       // Create a frame piece (metallic lengthy component with fringes)
@@ -241,15 +254,22 @@
         ];
         const panelFront = new THREE.Mesh(panelGeometry, panelMaterials[0]);
         const panelBack = new THREE.Mesh(panelGeometry, panelMaterials[1]);
+        const panelLight = new THREE.RectAreaLight(0xffffff, 0.25, 28, 3);
+
+        // Naming
         panelBack.name = name + "_back";
+        panelLight.name = name + "_light";
 
         // Distance the front and back faces
         panelFront.position.z = fringeLength / 2;
         panelBack.position.z = -fringeLength / 2;
+        panelLight.position.z = -fringeLength;
+        panelLight.lookAt(0, 0, 0);
 
         // Add front and back to the panel group
         panel.add(panelFront);
         panel.add(panelBack);
+        panel.add(panelLight);
 
         return panel;
       }
@@ -286,26 +306,32 @@
         const screenPanelGeometry = new THREE.BoxGeometry(28 - 2 * cornerWidth, 24 - 2 * cornerWidth, fringeLength / 2);
         const screenBottomGeometry = new THREE.BoxGeometry(28 - 2 * cornerWidth, 2 * cornerWidth, fringeLength);
         const screenPanel = new THREE.Mesh(screenPanelGeometry, screenMaterial);
+        const screenPanelLight = new THREE.RectAreaLight(0xffffff, 0.25, 28 - 2 * cornerWidth, 24 - 2 * cornerWidth);
         const screenBottom = new THREE.Mesh(screenBottomGeometry, material);
+
+        // Naming
         screen.name = name + "_screen";
         screenPanel.name = name + "_screenPanel";
+        screenPanelLight.name = name + "_screenPanelLight";
         screenBottom.name = name + "_screenBottom";
 
         // Position the screen parts
         screenBottom.position.y = cornerWidth;
         screenPanel.position.y = 12 + cornerWidth;
-
+        screenPanelLight.position.set(0, 12 + cornerWidth, -fringeLength);
+        screenPanelLight.lookAt(0, 0, 0);
         // Add screen parts to the screen group
         screen.add(screenPanel);
+        screen.add(screenPanelLight);
         screen.add(screenBottom);
 
-        // Position the frames and the screen
+        // Position the frames
         const innerFringePosition = -(cornerWidth + fringeLength / 2);
         tFrame.position.y = 24.5;
         lFrame.position.set(-14, 12, innerFringePosition);
         rFrame.position.set(14, 12, innerFringePosition);
 
-        // Add parts to the group
+        // Add all to the same group
         screenLowerer.add(tFrame);
         screenLowerer.add(lFrame);
         screenLowerer.add(rFrame);
@@ -362,44 +388,48 @@
       function createLamp(name = "lamp") {
         // Create the lamp group
         const lamp = new THREE.Object3D();
+        lamp.name = name;
 
-        // Create a placeholder cube for the lamp
-        const lampMaterial = new THREE.MeshLambertMaterial({ color: "#ffffff" });
-        const lampGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const lampCube = new THREE.Mesh(lampGeometry, lampMaterial);
-        lampCube.name = "lampCube";
-
-        // Position the lamp elements
-        lampCube.position.y = -1; // Anchor point at the top
+        // Create a light target so they point down
+        const lightTarget = new THREE.Object3D();
+        lightTarget.position.y = -5;
 
         // Directional Light
         const directionalColor = 0xffffff;
         const directionalIntensity = 0.25;
         const directionalLight = new THREE.DirectionalLight(directionalColor, directionalIntensity);
         directionalLight.name = name + "_directionalLight";
-        directionalLight.target = scene;
+        directionalLight.target = lightTarget;
         directionalLight.visible = false;
+        directionalLight.castShadow = true;
 
         // Point light
         const pointColor = 0xffffff;
-        const pointIntensity = 0.6;
+        const pointIntensity = 0.25;
         const pointDistance = 100;
         const pointDecay = 2;
         const pointLight = new THREE.PointLight(pointColor, pointIntensity, pointDistance, pointDecay);
         pointLight.name = name + "_pointLight";
+        pointLight.castShadow = true;
 
         // Spotlight
         const spotLight = new THREE.SpotLight(0xffffff, 0.25);
         spotLight.name = name + "_spotLight";
-        spotLight.target = scene;
+        spotLight.target = lightTarget;
         spotLight.visible = false;
+        spotLight.castShadow = true;
 
         // Hemisphere light
-        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.25);
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.2);
         hemisphereLight.name = name + "_hemisphereLight";
 
+        // Position the lights so they're not inside the roof
+        directionalLight.position.y = -2;
+        pointLight.position.y = -2;
+        spotLight.position.y = -2;
+
         // Add to the lamp group
-        lamp.add(lampCube);
+        lamp.add(lightTarget);
         lamp.add(directionalLight);
         lamp.add(pointLight);
         lamp.add(spotLight);
@@ -431,10 +461,6 @@
 
         // Create the lamp
         const lamp = createLamp(name + "_lamp");
-
-        // DEBUG
-        const axesHelper = new THREE.AxesHelper(5);
-        lamp.add(axesHelper);
 
         // Position the upper panel
         upperPanel.position.y = 0.25;
@@ -570,6 +596,14 @@
         const coneLambert = scene.getObjectByName("coneLambert");
         const spherePhysical = scene.getObjectByName("spherePhysical");
         const cylinderPhong = scene.getObjectByName("cylinderPhong");
+        const frontPanelLight = scene.getObjectByName("cornelBox_frontCornelFace_screenLowerer_screenPanelLight");
+        const leftPanelLight = scene.getObjectByName("cornelBox_leftCornelFace_screenLowerer_screenPanelLight");
+        const rightPanelLight = scene.getObjectByName("cornelBox_rightCornelFace_screenLowerer_screenPanelLight");
+        const backPanelLight = scene.getObjectByName("cornelBox_backCornelFace_screenLowerer_screenPanelLight");
+        const frontTopPanelLight = scene.getObjectByName("cornelBox_frontCornelFace_panel_light");
+        const leftTopPanelLight = scene.getObjectByName("cornelBox_leftCornelFace_panel_light");
+        const rightTopPanelLight = scene.getObjectByName("cornelBox_rightCornelFace_panel_light");
+        const backTopPanelLight = scene.getObjectByName("cornelBox_backCornelFace_panel_light");
 
         // Example textures
         const exampleTexture = new THREE.TextureLoader().load("textures/grenouille.jpg");
@@ -741,11 +775,19 @@
           physicalThicknessMap: spherePhysical.material.thicknessMap,
           physicalTransmission: spherePhysical.material.transmission,
           physicalTransmissionMap: spherePhysical.material.transmissionMap,
+
+          // LightShadow properties
+          shadowAutoUpdate: directionalLight.shadow.autoUpdate,
+          shadowBias: directionalLight.shadow.bias,
+          shadowBlurSamples: directionalLight.shadow.blurSamples,
+          shadowMapWidth: directionalLight.shadow.mapSize.width,
+          shadowMapHeight: directionalLight.shadow.mapSize.height,
+          shadowNormalBias: directionalLight.shadow.normalBias,
+          shadowRadius: directionalLight.shadow.radius,
         };
 
         // Top-level folder for structure related folders
         const folderStructure = gui.addFolder("Structure");
-        folderStructure.close();
 
         // Screen lowerer settings
         const folderScreenLowerer = folderStructure.addFolder("Screen Lowerers");
@@ -782,6 +824,8 @@
           .onChange((color) => {
             frontPanel.material.color.set(color);
             frontTopPanel.material.color.set(color);
+            frontPanelLight.color = color;
+            frontTopPanelLight.color = color;
           });
         folderPanels
           .addColor(settings, "leftPanelColor")
@@ -789,6 +833,8 @@
           .onChange((color) => {
             leftPanel.material.color.set(color);
             leftTopPanel.material.color.set(color);
+            leftPanelLight.color = color;
+            leftTopPanelLight.color = color;
           });
         folderPanels
           .addColor(settings, "rightPanelColor")
@@ -796,6 +842,8 @@
           .onChange((color) => {
             rightPanel.material.color.set(color);
             rightTopPanel.material.color.set(color);
+            rightPanelLight.color = color;
+            rightTopPanelLight.color = color;
           });
         folderPanels
           .addColor(settings, "backPanelColor")
@@ -803,6 +851,8 @@
           .onChange((color) => {
             backPanel.material.color.set(color);
             backTopPanel.material.color.set(color);
+            backPanelLight.color = color;
+            backTopPanelLight.color = color;
           });
         folderPanels
           .addColor(settings, "roofPanel")
@@ -887,9 +937,9 @@
           .add(settings, "directionalLightTarget", {
             Scene: scene,
             Table: table,
-            Cone: cone,
-            Sphere: sphere,
-            Cylinder: cylinder,
+            Cone: coneLambert,
+            Sphere: spherePhysical,
+            Cylinder: cylinderPhong,
           })
           .name("Target")
           .onChange((tgt) => {
@@ -928,8 +978,6 @@
           .onChange((value) => {
             pointLight.power = value;
           });
-
-        // TODO: NEXT STEPS HERE!
 
         // Add other spot light settings
         folderSpotLight
@@ -982,9 +1030,9 @@
           .add(settings, "spotLightTarget", {
             Scene: scene,
             Table: table,
-            Cone: cone,
-            Sphere: sphere,
-            Cylinder: cylinder,
+            Cone: coneLambert,
+            Sphere: spherePhysical,
+            Cylinder: cylinderPhong,
           })
           .name("Target")
           .onChange((tgt) => {
@@ -2057,6 +2105,97 @@
             spherePhysical.material.transmissionMap = value;
           });
 
+        /* --- SHADOWS --- */
+        const folderShadow = gui.addFolder("Shadows");
+        folderShadow
+          .add(settings, "shadowAutoUpdate")
+          .name("Auto update")
+          .onChange((value) => {
+            directionalLight.shadow.autoUpdate = value;
+            pointLight.shadow.autoUpdate = value;
+            spotLight.shadow.autoUpdate = value;
+          });
+
+        folderShadow
+          .add(settings, "shadowBias")
+          .name("Bias")
+          .onChange((value) => {
+            directionalLight.shadow.bias = value;
+            pointLight.shadow.bias = value;
+            spotLight.shadow.bias = value;
+          });
+
+        folderShadow
+          .add(settings, "shadowBlurSamples")
+          .name("Blur samples")
+          .onChange((value) => {
+            directionalLight.shadow.blurSamples = value;
+            pointLight.shadow.blurSamples = value;
+            spotLight.shadow.blurSamples = value;
+          });
+
+        folderShadow
+          .add(settings, "shadowMapWidth")
+          .name("Map width")
+          .onChange((value) => {
+            directionalLight.shadow.mapSize.width = value;
+            directionalLight.shadow.map.dispose();
+            directionalLight.shadow.map = null;
+
+            pointLight.shadow.mapSize.width = value;
+            pointLight.shadow.map.dispose();
+            pointLight.shadow.map = null;
+
+            spotLight.shadow.mapSize.width = value;
+            spotLight.shadow.map.dispose();
+            spotLight.shadow.map = null;
+          });
+
+        folderShadow
+          .add(settings, "shadowMapHeight")
+          .name("Map height")
+          .onChange((value) => {
+            directionalLight.shadow.mapSize.height = value;
+            directionalLight.shadow.map.dispose();
+            directionalLight.shadow.map = null;
+
+            pointLight.shadow.mapSize.height = value;
+            pointLight.shadow.map.dispose();
+            pointLight.shadow.map = null;
+
+            spotLight.shadow.mapSize.height = value;
+            spotLight.shadow.map.dispose();
+            spotLight.shadow.map = null;
+          });
+
+        folderShadow
+          .add(settings, "shadowNormalBias")
+          .name("Normal bias")
+          .onChange((value) => {
+            directionalLight.shadow.normalBias = value;
+            pointLight.shadow.normalBias = value;
+            spotLight.shadow.normalBias = value;
+          });
+
+        folderShadow
+          .add(settings, "shadowRadius")
+          .name("Radius")
+          .onChange((value) => {
+            directionalLight.shadow.radius = value;
+            pointLight.shadow.radius = value;
+            spotLight.shadow.radius = value;
+          });
+        // Add gui to VR
+        const group = new InteractiveGroup(renderer, camera);
+        scene.add(group);
+
+        const mesh = new HTMLMesh(gui.domElement);
+        mesh.position.x = -1;
+        mesh.position.y = 2;
+        mesh.position.z = -0.5;
+        mesh.rotation.y = Math.PI / 4;
+        mesh.scale.setScalar(2);
+        group.add(mesh);
         // TODO: for VR, place the gui as an object with listeners for sessionStart and sessionEnd so it only shows up in VR
       }
 
@@ -2094,6 +2233,17 @@
         document.body.appendChild(VRButton.createButton(renderer));
 
         // Controller setup
+        const geometry = new THREE.BufferGeometry();
+        geometry.setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -5)]);
+
+        const controller1 = renderer.xr.getController(0);
+        controller1.add(new THREE.Line(geometry));
+        scene.add(controller1);
+
+        const controller2 = renderer.xr.getController(1);
+        controller2.add(new THREE.Line(geometry));
+        scene.add(controller2);
+
         const controllerModelFactory = new XRControllerModelFactory();
         const controllerGrip1 = renderer.xr.getControllerGrip(0);
         controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
@@ -2103,68 +2253,11 @@
         scene.add(controllerGrip2);
       }
 
-      /* FROM PREVIOUS EXERCISES */
       // Fix window resize
       function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
-      }
-
-      // Create a cross using a Line. `opacity` defines its opacity
-      function createCross(opacity) {
-        const material = new THREE.LineBasicMaterial({
-          color: 0xffffff,
-          opacity: opacity,
-          transparent: true,
-        });
-        const points = [];
-        points.push(new THREE.Vector3(1, 0, 0));
-        points.push(new THREE.Vector3(-1, 0, 0));
-        points.push(new THREE.Vector3(0, 0, 0));
-        points.push(new THREE.Vector3(0, 0, 1));
-        points.push(new THREE.Vector3(0, 0, -1));
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const cross = new THREE.Line(geometry, material);
-        return cross;
-      }
-
-      // Create a floor of crosses
-      function floorOfCrosses(FADE_START = 100, FADE_END = 200) {
-        /*
-        `FADE_START`:Minimum distance from center with opacity=1
-        `FADE_END`: Distance from center at which opacity=0
-        */
-        const floor = new THREE.Object3D();
-        scene.add(floor);
-        floor.position.y = 0.1;
-        // Loop through x and z axis from -50 to +50, so that the floor center is at (0,0,0)
-        for (let x = -50; x < 50; x++) {
-          // x axis
-          for (let z = -50; z < 50; z++) {
-            // z axis
-            const x_pos = x * 10; // Scale up by 10
-            const z_pos = z * 10; // Scale up by 10
-            // Calculate distance from center to determine cross opacity. This create a fading effect in a round area around the center
-            const radius = Math.sqrt(Math.pow(x_pos, 2) + Math.pow(z_pos, 2));
-            const FADE_RANGE = FADE_END - FADE_START; // Range of progressive fade
-            let crossOpacity;
-            if (radius < FADE_START) {
-              // Show cross with full opacity when its under the minimum distance
-              crossOpacity = 1;
-            } else {
-              // Progressive opacity reduction the further from the center it is
-              const distance = radius - FADE_START; // Distance from start of fade
-              crossOpacity = 1 - distance / FADE_RANGE;
-            }
-            // Create and position the cross
-            const cross = createCross(crossOpacity);
-            cross.position.x = x_pos;
-            cross.position.z = z_pos;
-            // Add the cross to the floor as a child
-            floor.add(cross);
-          }
-        }
       }
     </script>
   </body>

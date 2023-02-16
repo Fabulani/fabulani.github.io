@@ -27,15 +27,15 @@
     <script type="module">
       import * as THREE from "three";
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-      import { createGrid } from "/src/Grid.js";
+      import { createGrid } from "./src/Grid.js";
       // import { applyWebcamBackground } from "/src/Webcam.js";
-      import { onWindowResize } from "/src/Utility.js";
-      import { setupGUI } from "/src/Gui.js";
+      import { onWindowResize } from "./src/Utility.js";
+      import { setupGUI } from "./src/Gui.js";
       // import { ColorCloud } from "/src/ColorCloud.js";
       // import { VideoManager } from "/src/VideoManager.js";
-      import { createCloudFromVideo } from "/src/Cloud.js";
+      import { createCloudFromVideo } from "./src/Cloud.js";
       import Stats from "three/addons/libs/stats.module.js";
-      import { Manager } from "/src/Manager.js";
+      import { Manager } from "./src/Manager.js";
 
       /* Main script */
       let camera, globalScene, scene, renderer, controls, stats;

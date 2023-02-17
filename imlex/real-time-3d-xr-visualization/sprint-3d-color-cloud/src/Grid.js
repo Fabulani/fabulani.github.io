@@ -3,6 +3,7 @@ import * as THREE from "three";
 export function createGrid() {
   // Group object
   const grid = new THREE.Object3D();
+  grid.name = "3d-cube-grid";
 
   // Add grid
   const size = 1;

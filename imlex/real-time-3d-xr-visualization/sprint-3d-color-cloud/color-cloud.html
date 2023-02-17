@@ -68,15 +68,6 @@
         // controls.autoRotate = true;
         controls.autoRotateSpeed = 1;
 
-        // Lights
-        {
-          const color = 0xffffff;
-          const intensity = 0.5;
-          const light = new THREE.AmbientLight(color, intensity);
-          light.name = "ambientLight";
-          scene.add(light);
-        }
-
         // FPS counter
         stats = new Stats();
         container.appendChild(stats.dom);
@@ -94,21 +85,21 @@
         scene.add(grid);
 
         // Manager
-        manager = new Manager(scene, video);
+        const constraints = {
+          video: {
+            width: {
+              max: 1920,
+            },
+            height: {
+              max: 1080,
+            },
+            facingMode: "environment",
+          },
+        };
+        manager = new Manager(scene, video, constraints);
 
         // Video
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const constraints = {
-            video: {
-              width: {
-                max: 1920,
-              },
-              height: {
-                max: 1080,
-              },
-              facingMode: "environment",
-            },
-          };
           navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
             video = document.createElement("video");
             video.srcObject = stream;
@@ -116,6 +107,9 @@
             manager.setVideo(video);
           });
         }
+
+        // Setup the GUI
+        const gui = setupGUI(manager);
       }
 
       function animate() {

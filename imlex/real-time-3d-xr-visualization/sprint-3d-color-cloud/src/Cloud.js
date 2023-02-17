@@ -73,7 +73,7 @@ export class ColorCloud {
     this.#shadowPoints = this.createPoints({ isShadow: true });
   }
 
-  createPoints(isShadow = false) {
+  createPoints({ isShadow } = { isShadow: false }) {
     const colorSpaceMaterial = new THREE.ShaderMaterial({
       vertexShader: vtxShader,
       fragmentShader: fragShader,

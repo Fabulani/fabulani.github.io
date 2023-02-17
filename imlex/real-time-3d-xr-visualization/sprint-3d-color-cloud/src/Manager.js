@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createCloudFromVideo } from "./src/Cloud.js";
+import { createCloudFromVideo } from "./Cloud.js";
 
 export class Manager {
   #videoTexture = null;

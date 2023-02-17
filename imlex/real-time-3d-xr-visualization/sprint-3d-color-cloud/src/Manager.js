@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { createCloudFromVideo } from "./Cloud.js";
+import { ColorCloud } from "./Cloud.js";
 
 export class Manager {
   #videoTexture = null;
@@ -42,9 +42,12 @@ export class Manager {
 
   #clearScene() {
     /* Dispose of unused geometries and remove from scene */
-    const cloud = this.scene.getObjectByName("colorCloud");
-    cloud.geometry.dispose();
-    this.scene.remove(cloud);
+    const sceneObjs = [this.scene.getObjectByName("colorCloud"), this.scene.getObjectByName("colorCloud-shadow")];
+
+    sceneObjs.forEach((obj) => {
+      obj.geometry.dispose();
+      this.scene.remove(obj);
+    });
   }
 
   #updateVideoTexture() {
@@ -68,11 +71,10 @@ export class Manager {
       this.#clearScene();
     }
 
-    // Add new point cloud
-    const newCloud = createCloudFromVideo(this.#videoTexture);
-    newCloud.name = "colorCloud";
-    newCloud.position.y = 0.5; // Centered on the cube
-    this.scene.add(newCloud);
+    // Add color cloud and its shadow
+    const colorCloud = new ColorCloud(this.#videoTexture, "rgb", "colorCloud");
+    this.scene.add(colorCloud.points);
+    this.scene.add(colorCloud.shadow);
 
     // Play
     this.playVideo();

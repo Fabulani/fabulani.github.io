@@ -6,24 +6,22 @@ export function setupGUI(manager) {
   const gui = new GUI({ title: "Color Cloud" });
 
   // Get available video streams
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    manager.getVideoDevices().then((availableDevices) => {
-      // Settings
-      const settings = {
-        selectedDevice: Object.keys(availableDevices)[0],
-        playVideo: manager.playVideo.bind(manager),
-        pauseVideo: manager.pauseVideo.bind(manager),
-      };
+  manager.getVideoDevices().then((availableDevices) => {
+    // Settings
+    const settings = {
+      selectedDevice: Object.keys(availableDevices)[0],
+      playVideo: manager.playVideo.bind(manager),
+      pauseVideo: manager.pauseVideo.bind(manager),
+    };
 
-      gui
-        .add(settings, "selectedDevice", availableDevices)
-        .name("Camera")
-        .onChange((value) => {
-          manager.setDevice(value);
-        });
+    gui
+      .add(settings, "selectedDevice", availableDevices)
+      .name("Camera")
+      .onChange((value) => {
+        manager.setDevice(value);
+      });
 
-      gui.add(settings, "playVideo").name("Play");
-      gui.add(settings, "pauseVideo").name("Pause");
-    });
-  }
+    gui.add(settings, "playVideo").name("Play");
+    gui.add(settings, "pauseVideo").name("Pause");
+  });
 }

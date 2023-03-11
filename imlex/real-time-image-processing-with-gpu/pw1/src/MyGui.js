@@ -8,15 +8,24 @@ export function setupGui(videoController) {
   // Settings
   const settings = {
     pausePlayVideo: videoController.pausePlayVideo.bind(videoController),
-    setVideo: "video.mp4",
+    setVideo: "city",
+    applyGaussian: true,
   };
 
   gui
-    .add(settings, "setVideo", { city: "video.mp4", moon: "moon.mp4" })
+    .add(settings, "setVideo", { city: "city.mp4", moon: "moon.mp4" })
     .name("Choose video")
     .onChange((value) => {
       videoController.setVideo(value);
     });
 
   gui.add(settings, "pausePlayVideo").name("Pause | Play");
+
+  gui
+    .add(settings, "applyGaussian")
+    .name("Apply Gaussian")
+    .onChange((value) => {
+      videoController.iProcessor.applyGaussian = value;
+      console.log(videoController.iProcessor.applyGaussian);
+    });
 }

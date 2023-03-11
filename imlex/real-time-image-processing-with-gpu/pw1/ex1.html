@@ -42,10 +42,12 @@
       import WEBGL from "three/addons/capabilities/WebGL.js";
       import { VideoController } from "./src/VideoController.js";
       import { setupGui } from "./src/MyGui.js";
+      import Stats from "three/addons/libs/stats.module.js";
 
       var camera, controls, scene, renderer, container;
       var context, canvas;
       var plan;
+      var stats;
 
       // VIDEO AND THE ASSOCIATED TEXTURE
       var video, videoTexture;
@@ -83,18 +85,22 @@
 
         // TODO: constrain camera controls to only zoom and pan
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 10);
-        camera.position.z = 0.7;
+        camera.position.z = 0.4;
         controls = new OrbitControls(camera, renderer.domElement);
         controls.minDistance = 0.005;
         controls.maxDistance = 1.0;
         controls.enableRotate = false;
+        controls.enableZoom = true;
         controls.addEventListener("change", render);
         controls.update();
+
+        scene.background = stats = new Stats();
+        container.appendChild(stats.dom);
 
         // Video controller
         video = document.createElement("video");
         vController = new VideoController(scene, video, canvas);
-        vController.setVideo("video.mp4");
+        vController.setVideo("city.mp4");
 
         setupGui(vController);
 
@@ -113,6 +119,7 @@
         requestAnimationFrame(animate);
         controls.update();
         render();
+        stats.update();
       }
 
       function onWindowResize() {
